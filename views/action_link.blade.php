@@ -1,0 +1,1 @@
+<a id="{{ $action }}_{{ $id }}" class="action {{ $action }}" title="{{ $title?:$text }}" href="{{ $action_url }}">{{ $text }}</a>

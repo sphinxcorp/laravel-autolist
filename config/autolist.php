@@ -1,24 +1,14 @@
 <?php
 
 return array(
-    'config_path' => path('app') . 'autolist/',
-    'permission_checks' => array(
-        'detail_view' => function($model, $id) {
-            return Auth::check();
-        },
-        'create' => function($model) {
-            return Auth::check();
-        },
-        'edit' => function($model, $id) {
-            return Auth::check();
-        },
-        'delete' => function($model, $id) {
-            return Auth::check();
-        },
-    ),
-    'templates' => array(
-        'list' => 'autolist::templates.list',
-        'action_link' => 'autolist::templates.action_link'
+    'permission_check' => function($action, $model, $id=FALSE) {
+        return Auth::check();
+    },
+    'views' => array(
+        'list' => 'autolist::list',
+        'header_item' => 'autolist::header_item',
+        'action_link' => 'autolist::action_link',
+        'pager_link' => 'autolist::action_link',
     ),
     'pager_enabled' => true,
     'page_size' => 10

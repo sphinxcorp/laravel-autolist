@@ -16,7 +16,7 @@
 */
 
 Autoloader::map(array(
-
+    'AutoList' => __DIR__ . '/autolist.php',
 ));
 
 /*
