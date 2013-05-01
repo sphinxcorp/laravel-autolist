@@ -1,1 +1,1 @@
-<a id="{{ $action }}_{{ $id }}" class="action {{ $action }}" title="{{ $title?:$text }}" href="{{ $action_url }}">{{ $text }}</a>
+<a id="{{ $action }}_{{ $id }}" class="autolist-action {{ $action }}" title="{{ $title }}" href="{{ Route::to($route) }}">{{ $text }}</a>

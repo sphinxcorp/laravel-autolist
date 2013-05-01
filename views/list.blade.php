@@ -1,3 +1,39 @@
-<h1>autolist::list</h1>
-
-<p>This is the 'autolist::list' view.</p>
+<table class="autolist">
+    <thead>
+        <tr>
+            @foreach ($attributes as $attribute)
+            <th>
+                @render(Config::get('autolist::autolist.view.header_item'),$attribute)
+            </th>
+            @endforeach
+            @if($has_item_actions)
+            <th>Actions</th>
+            @endif
+        </tr>
+    </thead>
+    <tbody>
+        @forelse($items as $item)
+        <tr>
+            @foreach ($attributes as $attribute=>$attr_details)
+            <td>{{ $item->$attribute }}</td>
+            @endforeach
+            @if($has_item_actions)
+            <th>{{ implode(' | ', $item->action_links) }}</th>
+            @endif
+        </tr>
+        @empty
+        <tr>
+            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) }}">There are no items to show.</td>
+        </tr>
+        @endforelse
+    </tbody>
+    @if(!empty($global_action_links))
+    <tfoot>
+        <tr>
+            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) }}">
+                {{ implode(' | ', $global_action_links) }} 
+            </td>
+        </tr>
+    </tfoot>
+    @endif
+</table>
