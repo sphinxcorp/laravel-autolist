@@ -26,13 +26,12 @@ class AutoList {
         $linkify = true;
         if (is_int($attribute) && is_string($options)) {
             $attribute = $options;
-            $title = ucwords($attribute);
+            $title = ucwords(str_replace('_', ' ', $attribute));
         } else if (is_array($options)) {
             $sortable = isset($options['sortable'])? : $sortable;
             $linkify = isset($options['linkify'])? : $linkify;
-            $title = isset($options['title']) ? $options['title'] : ucwords($attribute);
-        }
-        else if(is_string($options)){
+            $title = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
+        } else if (is_string($options)) {
             $title = $options;
         }
 
@@ -40,22 +39,30 @@ class AutoList {
     }
 
     private function _get_action_details($action, $options) {
-        if (is_int($action) && is_string($options)) {
-            $action = $options;
-            $text = $title = ucwords($action);
+        if (is_string($options)) {
+            if (is_int($action)) {
+                $action = $options;
+                $text = $title = ucwords(str_replace('_', ' ', $action));
+            } else {
+                $text = $title = ucwords($options);
+            }
             $controller_action = $this->config['action_controller'] . "@$action";
-        } else if (is_array($options)) {
-            $text = $options['text'];
-            $title = $options['title']? : $options['text'];
-            $controller_action = isset($options['route']) ? $options['route'] : $this->config['action_controller'] . "@$action";
+            $permission_check = NULL;
+        } else if (is_string($action) && is_array($options)) {
+            $text = $options['text']? : ($options['title']? : ucwords(str_replace('_', ' ', $action)));
+            $title = $options['title']? : $text;
+            $controller_action = isset($options['controller_action']) ? $options['controller_action'] : $this->config['action_controller'] . "@$action";
+            $permission_check = isset($options['permission_check']) ? $options['permission_check'] : NULL;
+        } else {
+            throw new Exception('Invalid configuration provided for action');
         }
-        return compact('action', 'text', 'title', 'controller_action');
+        return compact('action', 'text', 'title', 'controller_action', 'permission_check');
     }
 
-    private function _get_entities() {
+    private function _get_query() {
         $model = $this->config['model'];
         $this->model = new $model;
-        $attributes = array_keys($this->config['attributes']);
+        $attributes = $this->config['attributes'];
         $eager_loads = array();
         $this->config['attributes'] = array();
         foreach ($attributes as $attribute => $options) {
@@ -72,15 +79,12 @@ class AutoList {
             $this->model->with($eager_loads);
         }
 
+        $query = $this->model;
         if (is_callable($this->query_modifier)) {
-            $this->model = call_user_func($this->query_modifier, $this->model);
+            $query = $this->model->where($this->query_modifier);
         }
-
-        if (!is_object($this->model) || !is_a($this->model, $this->config['model'])) {
-            return array();
-        }
-
-        return $this->model->get();
+        
+        return $query;
     }
 
     public function set_query_modifier($query_modifier) {
@@ -88,25 +92,49 @@ class AutoList {
     }
 
     public function render() {
-        $items = $this->_get_entities();
+        $query = $this->_get_query();
+        
+        $paginate = isset($this->config['pager_enabled'])?$this->config['pager_enabled']:Config::get('autolist::autolist.pager_enabled',true);
+        $per_page = isset($this->config['page_size'])?$this->config['page_size']:Config::get('autolist::autolist.page_size',10);
+        
+        $page_links = FALSE;
+        if($paginate){
+            $pager = $query->paginate($per_page);
+            $page_links = $pager->links();
+            $items = $pager->results;
+        }
+        else {
+            $items = $query->get();
+        }
+        
         $permission_check = isset($this->config['permission_check']) && is_callable($this->config['permission_check']) ? $this->config['permission_check'] : Config::get('autolist::autolist.permission_check');
 
         $permitted_items = array();
         $has_item_actions = false;
-        foreach ($items as &$item) {
+        foreach ($items as $item) {
             if ($permission_check && is_callable($permission_check) && !$permission_check('view', $item, $item->id)) {
                 continue;
             }
 
-            $item->attributes['action_links'] = array();
+            $action_links = array();
             foreach ($this->config['item_actions'] as $action => $action_options) {
                 $action_details = $this->_get_action_details($action, $action_options);
-                if ($permission_check && is_callable($permission_check) && $permission_check($action_details['action'], $item, $item->id)) {
+                $action_permitted = true;
+                if (is_callable($action_details['permission_check'])) {
+                    $action_permission_check = $action_details['permission_check'];
+                    $action_permitted = $action_permission_check($item, $item->id);
+                } else if (is_callable($permission_check)) {
+                    $action_permitted = $permission_check($action_details['action'], $item, $item->id);
+                }
+
+                if ($action_permitted) {
                     $action_details['id'] = $item->id;
-                    $item->attributes['action_links'][$action_details['action']] = View::make(Config::get('autolist::autolist.views.action_link'), $action_details)->render();
+                    $action_links[$action_details['action']] = View::make(Config::get('autolist::autolist.views.action_link'), $action_details)->render();
                     $has_item_actions = true;
                 }
             }
+
+            $item->action_links = $action_links;
 
             $permitted_items[] = $item;
         }
@@ -114,20 +142,29 @@ class AutoList {
         $global_action_links = array();
         foreach ($this->config['global_actions'] as $action => $action_options) {
             $action_details = $this->_get_action_details($action, $action_options);
-            if ($permission_check && is_callable($permission_check) && $permission_check($action_details['action'], $this->model, NULL)) {
+
+            $action_permitted = true;
+            if (is_callable($action_details['permission_check'])) {
+                $action_permission_check = $action_details['permission_check'];
+                $action_permitted = $action_permission_check($item);
+            } else if (is_callable($permission_check)) {
+                $action_permitted = $permission_check($action_details['action'], $item);
+            }
+            if ($action_permitted) {
                 $action_details['id'] = NULL;
                 $global_action_links[$action_details['action']] = View::make(Config::get('autolist::autolist.views.action_link'), $action_details);
             }
         }
-        
+
         $list_data = array(
             'title' => $this->config['title_plural'],
             'attributes' => $this->config['attributes'],
-            'has_item_actions'=>$has_item_actions,
+            'has_item_actions' => $has_item_actions,
             'items' => $permitted_items,
-            'global_action_links' => $global_action_links
+            'global_action_links' => $global_action_links,
+            'page_links' => $page_links
         );
-        
+
         return View::make(Config::get('autolist::autolist.views.list'), $list_data)->render();
     }
 

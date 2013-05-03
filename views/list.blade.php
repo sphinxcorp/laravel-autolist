@@ -16,7 +16,7 @@
         @forelse($items as $item)
         <tr>
             @foreach ($attributes as $attribute=>$attr_details)
-            <td>{{ $item->$attribute }}</td>
+            <td>{{ e($item->$attribute) }}</td>
             @endforeach
             @if($has_item_actions)
             <th>{{ implode(' | ', $item->action_links) }}</th>
@@ -28,11 +28,15 @@
         </tr>
         @endforelse
     </tbody>
-    @if(!empty($global_action_links))
+    @if(!empty($global_action_links) || $page_links)
     <tfoot>
         <tr>
-            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) }}">
-                {{ implode(' | ', $global_action_links) }} 
+            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) -1 }}">
+                {{ $page_links }}
+            </td>
+            <td>@if(!empty($global_action_links)) 
+                {{ implode(' | ', $global_action_links) }}
+                @endif
             </td>
         </tr>
     </tfoot>
