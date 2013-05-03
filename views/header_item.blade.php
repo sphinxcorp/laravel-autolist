@@ -1,1 +1,1 @@
-<span class="{{ $sortable }}">{{ $title }}</span>
+<span class="{{ $sortable?"sortable":"" }}">{{ $title }}</span>

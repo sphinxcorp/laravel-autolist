@@ -1,9 +1,10 @@
 <table class="autolist">
+    <caption>{{ $title }}</caption>
     <thead>
         <tr>
             @foreach ($attributes as $attribute)
             <th>
-                @render(Config::get('autolist::autolist.view.header_item'),$attribute)
+                @render(Config::get('autolist::autolist.views.header_item'),$attribute)
             </th>
             @endforeach
             @if($has_item_actions)
