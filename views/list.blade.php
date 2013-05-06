@@ -2,9 +2,9 @@
     <caption>{{ $title }}</caption>
     <thead>
         <tr>
-            @foreach ($attributes as $attribute)
+            @foreach ($header_columns as $attribute=>$header_column)
             <th>
-                @render(Config::get('autolist::autolist.views.header_item'),$attribute)
+                {{ $header_column }}
             </th>
             @endforeach
             @if($has_item_actions)
@@ -15,23 +15,23 @@
     <tbody>
         @forelse($items as $item)
         <tr>
-            @foreach ($attributes as $attribute=>$attr_details)
-            <td>{{ e($item->$attribute) }}</td>
+            @foreach (array_keys($header_columns) as $attribute)
+            <td>{{ $item[$attribute] }}</td>
             @endforeach
             @if($has_item_actions)
-            <th>{{ implode(' | ', $item->action_links) }}</th>
+            <td>{{ implode(' | ', $item['action_links']) }}</td>
             @endif
         </tr>
         @empty
         <tr>
-            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) }}">There are no items to show.</td>
+            <td colspan="{{ count($header_columns) + ($has_item_actions?1:0) }}">There are no items to show.</td>
         </tr>
         @endforelse
     </tbody>
     @if(!empty($global_action_links) || $page_links)
     <tfoot>
         <tr>
-            <td colspan="{{ count($attributes) + ($has_item_actions?1:0) -1 }}">
+            <td colspan="{{ count($header_columns) + ($has_item_actions?1:0) -1 }}">
                 {{ $page_links }}
             </td>
             <td>@if(!empty($global_action_links)) 
