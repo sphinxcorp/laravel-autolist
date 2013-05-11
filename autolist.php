@@ -4,6 +4,7 @@ class AutoList {
 
     var $config;
     var $model;
+    var $model_key;
     var $query_modifier = NULL;
 
     /**
@@ -85,6 +86,8 @@ class AutoList {
     private function _get_query() {
         $model                      = $this->config['model'];
         $this->model                = new $model;
+        $model_class = new ReflectionClass($model);
+        $this->model_key            = $model_class->getStaticPropertyValue('key');
         $attributes                 = $this->config['attributes'];
         $eager_loads                = array();
         $this->config['attributes'] = array();
@@ -127,7 +130,7 @@ class AutoList {
         if (!$is_relational && $attribute_details['linkify'] && !empty($raw_value)) {
             $controller_action = $this->config['action_controller'] . "@$detail_view_action";
             $value             = render(Config::get('autolist::autolist.views.detail_link'), array(
-                'id'                => $item->id,
+                'id'                => $item->{$this->model_key},
                 'attribute'         => $attribute_details['attribute'],
                 'action'            => $detail_view_action,
                 'raw_value'         => $raw_value,
@@ -165,9 +168,9 @@ class AutoList {
         $has_item_actions = false;
 
         foreach ($items as $item) {
-            if (!is_null($detail_view_permission_check) && !($detail_view_permission_check($item, $item->id))) {
+            if (!is_null($detail_view_permission_check) && !($detail_view_permission_check($item, $item->{$this->model_key}))) {
                 continue;
-            } else if ($permission_check && is_callable($permission_check) && !$permission_check($detail_view_action, $item, $item->id)) {
+            } else if ($permission_check && is_callable($permission_check) && !$permission_check($detail_view_action, $item, $item->{$this->model_key})) {
                 continue;
             }
 
@@ -177,13 +180,13 @@ class AutoList {
                 $action_permitted = true;
                 if (is_callable($action_details['permission_check'])) {
                     $action_permission_check = $action_details['permission_check'];
-                    $action_permitted        = $action_permission_check($item, $item->id);
+                    $action_permitted        = $action_permission_check($item, $item->{$this->model_key});
                 } else if (is_callable($permission_check)) {
-                    $action_permitted = $permission_check($action_details['action'], $item, $item->id);
+                    $action_permitted = $permission_check($action_details['action'], $item, $item->{$this->model_key});
                 }
 
                 if ($action_permitted) {
-                    $action_details['id']                    = $item->id;
+                    $action_details['id']                    = $item->{$this->model_key};
                     $action_links[$action_details['action']] = render(Config::get('autolist::autolist.views.action_link'), $action_details);
                     $has_item_actions                        = true;
                 }
