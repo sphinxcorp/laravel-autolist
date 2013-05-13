@@ -26,6 +26,7 @@ class AutoList {
         $sortable    = true;
         $linkify     = false;
         $auto_escape = true;
+        $decoder = null;
         if (is_int($attribute) && is_string($options)) {
             $attribute = $options;
             $title     = ucwords(str_replace('_', ' ', $attribute));
@@ -34,11 +35,12 @@ class AutoList {
             $linkify     = isset($options['linkify']) ? $options['linkify'] : $linkify;
             $auto_escape = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
             $title       = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
+            $decoder    = isset($options['decoder']) && is_callable($options['decoder'])?$options['decoder']:NULL;
         } else if (is_string($options)) {
             $title = $options;
         }
 
-        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape');
+        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape','decoder');
     }
 
     private function _get_action_details($action, $options) {
@@ -89,7 +91,7 @@ class AutoList {
         $model_class = new ReflectionClass($model);
         $this->model_key            = $model_class->getStaticPropertyValue('key');
         $attributes                 = $this->config['attributes'];
-        $eager_loads                = array();
+        $eager_loads                = is_array($this->config['eager_loads'])?$this->config['eager_loads']:array();
         $this->config['attributes'] = array();
         foreach ($attributes as $attribute => $options) {
             $attribute_details = $this->_get_attribute_details($attribute, $options);
@@ -120,12 +122,16 @@ class AutoList {
         $is_relational   = count($attribute_parts) > 1;
         foreach ($attribute_parts as $part) {
             $raw_value = $value_store->$part;
-            if (empty($raw_value) || !is_object($raw_value)) {
+            if (!is_object($raw_value)) {
                 break;
             }
             $value_store = $raw_value;
         }
 
+        if($attribute_details['decoder']){
+            $raw_value = $attribute_details['decoder']($raw_value);
+        }
+        
         $value = $attribute_details['auto_escape'] ? e($raw_value) : $raw_value;
         if (!$is_relational && $attribute_details['linkify'] && !empty($raw_value)) {
             $controller_action = $this->config['action_controller'] . "@$detail_view_action";
