@@ -26,7 +26,8 @@ class AutoList {
         $sortable    = true;
         $linkify     = false;
         $auto_escape = true;
-        $decoder = null;
+        $decoder     = null;
+        $relational  = false;
         if (is_int($attribute) && is_string($options)) {
             $attribute = $options;
             $title     = ucwords(str_replace('_', ' ', $attribute));
@@ -35,12 +36,12 @@ class AutoList {
             $linkify     = isset($options['linkify']) ? $options['linkify'] : $linkify;
             $auto_escape = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
             $title       = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
-            $decoder    = isset($options['decoder']) && is_callable($options['decoder'])?$options['decoder']:NULL;
+            $decoder     = isset($options['decoder']) && is_callable($options['decoder']) ? $options['decoder'] : NULL;
         } else if (is_string($options)) {
             $title = $options;
         }
 
-        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape','decoder');
+        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'relational');
     }
 
     private function _get_action_details($action, $options) {
@@ -61,6 +62,7 @@ class AutoList {
         } else {
             throw new Exception('Invalid configuration provided for action');
         }
+
         return compact('action', 'text', 'title', 'controller_action', 'permission_check');
     }
 
@@ -82,16 +84,16 @@ class AutoList {
             }
         }
 
+
         return array($action, $permission_check);
     }
 
     private function _get_query() {
-        $model                      = $this->config['model'];
-        $this->model                = new $model;
-        $model_class = new ReflectionClass($model);
-        $this->model_key            = $model_class->getStaticPropertyValue('key');
+        $model_class                = $this->config['model'];
+        $this->model                = new $model_class;
+        $this->model_key            = $model_class::$key;
         $attributes                 = $this->config['attributes'];
-        $eager_loads                = is_array($this->config['eager_loads'])?$this->config['eager_loads']:array();
+        $eager_loads                = is_array($this->config['eager_loads']) ? $this->config['eager_loads'] : array();
         $this->config['attributes'] = array();
         foreach ($attributes as $attribute => $options) {
             $attribute_details = $this->_get_attribute_details($attribute, $options);
@@ -99,6 +101,7 @@ class AutoList {
             if (count($parts) > 1) {
                 array_pop($parts);
                 $eager_loads[] = implode('.', $parts);
+                $attribute_details['relational'] = true;
             }
             $this->config['attributes'][$attribute_details['attribute']] = $attribute_details;
         }
@@ -108,6 +111,7 @@ class AutoList {
         }
 
         $query = $this->model;
+
         if (is_callable($this->query_modifier)) {
             $query = $this->model->where($this->query_modifier);
         }
@@ -128,10 +132,10 @@ class AutoList {
             $value_store = $raw_value;
         }
 
-        if($attribute_details['decoder']){
+        if ($attribute_details['decoder']) {
             $raw_value = $attribute_details['decoder']($raw_value);
         }
-        
+
         $value = $attribute_details['auto_escape'] ? e($raw_value) : $raw_value;
         if (!$is_relational && $attribute_details['linkify'] && !empty($raw_value)) {
             $controller_action = $this->config['action_controller'] . "@$detail_view_action";
@@ -154,12 +158,29 @@ class AutoList {
     public function render() {
         $query = $this->_get_query();
 
+        $sort_by = Input::query('sort_by', $this->config['default_sort']);
+        if (!empty($sort_by) && $this->config['attributes'][$sort_by]['sortable'] 
+                && is_null($this->config['attributes'][$sort_by]['decoder']) // decoded attributes won't be sortable
+                && !$this->config['attributes'][$sort_by]['relational']) { // relational attributes won't be sortable
+            if (!method_exists($this->model, "get_{$sort_by}")) { // ignoring the computed attributes with sortable flag set
+                $sort_dir = Input::query('sort_dir');
+                if (empty($sort_dir)) {
+                    $sort_dir = ($sort_by == $this->config['default_sort'] && !empty($this->config['default_sort_dir'])) ? $this->config['default_sort_dir'] : 'ASC';
+                }
+
+                $query = $query->order_by($sort_by, strtolower($sort_dir));
+            }
+        }
+
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
         $per_page = isset($this->config['page_size']) ? $this->config['page_size'] : Config::get('autolist::autolist.page_size', 10);
 
         $page_links = FALSE;
         if ($paginate) {
-            $pager      = $query->paginate($per_page);
+            $pager = $query->paginate($per_page);
+            if (!empty($sort_by)) {
+                $pager->appends(compact('sort_by', 'sort_dir'));
+            }
             $page_links = $pager->links();
             $items      = $pager->results;
         } else {
@@ -230,6 +251,7 @@ class AutoList {
             $header_columns[$attribute] = render(Config::get('autolist::autolist.views.header_item'), $attribute_details);
         }
 
+
         $list_data = array(
             'title'               => $this->config['title'],
             'header_columns'      => $header_columns,
@@ -238,7 +260,6 @@ class AutoList {
             'global_action_links' => $global_action_links,
             'page_links'          => $page_links,
         );
-
         return render(Config::get('autolist::autolist.views.list'), $list_data);
     }
 
