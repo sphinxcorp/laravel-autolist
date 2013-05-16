@@ -163,7 +163,6 @@ class AutoList {
 
     public function render() {
         $query = $this->_get_query();
-        var_dump($this->model);
         $sort_by = Input::query('sort_by', $this->config['default_sort']);
         if (!empty($sort_by) && $this->config['attributes'][$sort_by]['sortable'] 
                 && is_null($this->config['attributes'][$sort_by]['decoder']) // decoded attributes won't be sortable
@@ -176,7 +175,6 @@ class AutoList {
                 }
 
                 $query = $query->order_by($sort_by, strtolower($sort_dir));
-                //var_dump($query);
             }
         }
         $search=Input::query('search');
