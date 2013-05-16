@@ -83,7 +83,7 @@ class AutoList {
                 }
             }
         }
-        
+
 
 
         return array($action, $permission_check);
@@ -110,18 +110,18 @@ class AutoList {
         if (!empty($eager_loads)) {
             $this->model->with($eager_loads);
         }
-        
+
         $query = $this->model;
 
         if (is_callable($this->query_modifier)) {
             $query = $this->model->where($this->query_modifier);
         }
-        
- 
+
+
         /*if (is_callable($this->query_modifier)) {
-            $query = $this->model->where($this->query_modifier);
+          $query = $this->model->where($this->query_modifier);
         }*/
-        
+
         return $query;
     }
 
@@ -177,16 +177,6 @@ class AutoList {
                 $query = $query->order_by($sort_by, strtolower($sort_dir));
             }
         }
-        $search=Input::query('search');
-        if($search){
-            foreach ($this->config['attributes'] as $key=>$value){
-                if (!method_exists($this->model, "get_{$key}")
-                && !$this->config['attributes'][$key]['relational']) { 
-                    $query=$query->or_where($key,'LIKE','%'.$search.'%');
-                }
-            }
-        }
-        
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
         $per_page = isset($this->config['page_size']) ? $this->config['page_size'] : Config::get('autolist::autolist.page_size', 10);
@@ -264,27 +254,16 @@ class AutoList {
 
         $header_columns = array();
         foreach ($this->config['attributes'] as $attribute => $attribute_details) {
-            if ($attribute_details['sortable'] && is_null($attribute_details['decoder']) 
-                    && !$attribute_details['relational'] 
-                    && !method_exists($this->model, "get_{$attribute_details['attribute']}")) {
-                $cur_url = URL::to(URI::current());
-                if (Input::get('page')!=NULL) {
-                    $cur_url.= '?page='.Input::get('page');
-                }
-                $link ='<a href="'.$cur_url;
-                if (strpos($cur_url,"?")==false) {
-                    $link.='?';
-                } else {
-                    $link.= '&';
-                }
-                $link.='sort_by='.$attribute_details['attribute'].'&sort_dir=';
-                $link_asc = $link.'ASC">'.'<i class="icon-chevron-up"></i>'.'</a>';
-                $link_desc = $link.'DESC">'.'<i class="icon-chevron-down"></i>'.'</a>';
-                $title = '<div class="row-fluid">';
-                $title .= '<div class="span7" align="left">'.$attribute_details['title'].'</div>';
-                $title .= '<div class="span5" align="right">' . $link_asc . $link_desc . '</div>';
-                $title .= '</div>';
-                $attribute_details['title']=$title;
+            if ($attribute_details['sortable'] && is_null($attribute_details['decoder']) && !$attribute_details['relational'] && !method_exists($this->model, "get_{$attribute_details['attribute']}")) {
+                $query_params                       = Input::query();
+                $query_params['sort_by']            = $attribute_details['attribute'];
+                $query_params['sort_dir']           = 'ASC';
+                $attribute_details['sort_url_asc']  = URI::current() . "?" . http_build_query($query_params);
+                $query_params['sort_dir']           = 'DESC';
+                $attribute_details['sort_url_desc'] = URI::current() . "?" . http_build_query($query_params);
+            }
+            else {
+                $attribute_details['sortable'] = false;
             }
             $header_columns[$attribute] = render(Config::get('autolist::autolist.views.header_item'), $attribute_details);
         }
@@ -299,7 +278,7 @@ class AutoList {
             'page_links'          => $page_links,
         );
         return render(Config::get('autolist::autolist.views.list'), $list_data);
-    } 
+    }
 
     public function __toString() {
         return $this->render();
