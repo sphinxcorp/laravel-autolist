@@ -23,25 +23,27 @@ class AutoList {
     }
 
     private function _get_attribute_details($attribute, $options) {
-        $sortable    = true;
-        $linkify     = false;
-        $auto_escape = true;
-        $decoder     = null;
-        $relational  = false;
+        $sortable        = true;
+        $linkify         = false;
+        $auto_escape     = true;
+        $decoder         = null;
+        $decoder_for_sql = null;
+        $relational      = false;
         if (is_int($attribute) && is_string($options)) {
             $attribute = $options;
             $title     = ucwords(str_replace('_', ' ', $attribute));
         } else if (is_array($options)) {
-            $sortable    = isset($options['sortable']) ? $options['sortable'] : $sortable;
-            $linkify     = isset($options['linkify']) ? $options['linkify'] : $linkify;
-            $auto_escape = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
-            $title       = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
-            $decoder     = isset($options['decoder']) && is_callable($options['decoder']) ? $options['decoder'] : NULL;
+            $sortable        = isset($options['sortable']) ? $options['sortable'] : $sortable;
+            $linkify         = isset($options['linkify']) ? $options['linkify'] : $linkify;
+            $auto_escape     = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
+            $title           = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
+            $decoder         = isset($options['decoder']) && is_callable($options['decoder']) ? $options['decoder'] : NULL;
+            $decoder_for_sql = isset($options['decoder_for_sql']) ? $options['decoder_for_sql'] : NULL;
         } else if (is_string($options)) {
             $title = $options;
         }
 
-        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'relational');
+        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'decoder_for_sql', 'relational');
     }
 
     private function _get_action_details($action, $options) {
@@ -84,8 +86,6 @@ class AutoList {
             }
         }
 
-
-
         return array($action, $permission_check);
     }
 
@@ -101,7 +101,7 @@ class AutoList {
             $parts             = explode('.', $attribute_details['attribute']);
             if (count($parts) > 1) {
                 array_pop($parts);
-                $eager_loads[] = implode('.', $parts);
+                $eager_loads[]                   = implode('.', $parts);
                 $attribute_details['relational'] = true;
             }
             $this->config['attributes'][$attribute_details['attribute']] = $attribute_details;
@@ -118,9 +118,9 @@ class AutoList {
         }
 
 
-        /*if (is_callable($this->query_modifier)) {
+        /* if (is_callable($this->query_modifier)) {
           $query = $this->model->where($this->query_modifier);
-        }*/
+          } */
 
         return $query;
     }
@@ -156,26 +156,35 @@ class AutoList {
         }
         return $value;
     }
+    
+    private function _really_sortable($attribute){
+        return !empty($attribute) // $sort_by param must not be empty
+                && $this->config['attributes'][$attribute]['sortable'] // $attribute must be sortable
+                && (is_null($this->config['attributes'][$attribute]['decoder']) || !is_null($this->config['attributes'][$attribute]['decoder_for_sql'])) // decoded attributes won't be sortable unless a decoder_for_sql is provided
+                && !$this->config['attributes'][$attribute]['relational']  // relational attributes won't be sortable
+                && !method_exists($this->model, "get_{$attribute}");
+    }
 
     public function set_query_modifier($query_modifier) {
         $this->query_modifier = $query_modifier;
     }
 
     public function render() {
-        $query = $this->_get_query();
+        $query   = $this->_get_query();
         $sort_by = Input::query('sort_by', $this->config['default_sort']);
-        if (!empty($sort_by) && $this->config['attributes'][$sort_by]['sortable'] 
-                && is_null($this->config['attributes'][$sort_by]['decoder']) // decoded attributes won't be sortable
-                && !$this->config['attributes'][$sort_by]['relational']) { // relational attributes won't be sortable
-            if (!method_exists($this->model, "get_{$sort_by}")) { // ignoring the computed attributes with sortable flag set
-                
-                $sort_dir = Input::query('sort_dir');
-                if (empty($sort_dir)) {
-                    $sort_dir = ($sort_by == $this->config['default_sort'] && !empty($this->config['default_sort_dir'])) ? $this->config['default_sort_dir'] : 'ASC';
-                }
-
-                $query = $query->order_by($sort_by, strtolower($sort_dir));
+        if ($this->_really_sortable($sort_by)) { // ignoring the computed attributes with sortable flag set
+            $sort_dir = Input::query('sort_dir');
+            if (empty($sort_dir)) {
+                $sort_dir = ($sort_by == $this->config['default_sort'] && !empty($this->config['default_sort_dir'])) ? $this->config['default_sort_dir'] : 'ASC';
             }
+            if (!is_null($this->config['attributes'][$sort_by]['decoder_for_sql'])) {
+                $decoder_for_sql = $this->config['attributes'][$sort_by]['decoder_for_sql'];
+                $sort_column     = is_callable($decoder_for_sql) ? $decoder_for_sql($sort_by) : $decoder_for_sql;
+                $sort_column     = DB::raw($sort_column);
+            } else {
+                $sort_column = $sort_by;
+            }
+            $query = $query->order_by($sort_column, strtolower($sort_dir));
         }
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
@@ -254,15 +263,14 @@ class AutoList {
 
         $header_columns = array();
         foreach ($this->config['attributes'] as $attribute => $attribute_details) {
-            if ($attribute_details['sortable'] && is_null($attribute_details['decoder']) && !$attribute_details['relational'] && !method_exists($this->model, "get_{$attribute_details['attribute']}")) {
+            if ($this->_really_sortable($attribute)) {
                 $query_params                       = Input::query();
                 $query_params['sort_by']            = $attribute_details['attribute'];
                 $query_params['sort_dir']           = 'ASC';
                 $attribute_details['sort_url_asc']  = URI::current() . "?" . http_build_query($query_params);
                 $query_params['sort_dir']           = 'DESC';
                 $attribute_details['sort_url_desc'] = URI::current() . "?" . http_build_query($query_params);
-            }
-            else {
+            } else {
                 $attribute_details['sortable'] = false;
             }
             $header_columns[$attribute] = render(Config::get('autolist::autolist.views.header_item'), $attribute_details);
