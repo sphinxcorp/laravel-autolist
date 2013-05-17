@@ -43,6 +43,13 @@ class AutoList {
             $title = $options;
         }
 
+        /**
+         * Compute whether the attributes is really sortable
+         */
+        $sortable = $sortable // must not be disabled through configuration
+                && (is_null($decoder) || !is_null($decoder_for_sql)) // decoded attributes won't be sortable unless a decoder_for_sql is provided
+                && !method_exists($this->model, "get_{$attribute}"); // computed fields are not sortabe
+
         return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'decoder_for_sql', 'relational');
     }
 
@@ -98,11 +105,12 @@ class AutoList {
         $this->config['attributes'] = array();
         foreach ($attributes as $attribute => $options) {
             $attribute_details = $this->_get_attribute_details($attribute, $options);
-            $parts             = explode('.', $attribute_details['attribute']);
+            $parts             = explode('.', $attribute);
             if (count($parts) > 1) {
                 array_pop($parts);
                 $eager_loads[]                   = implode('.', $parts);
                 $attribute_details['relational'] = true;
+                $attribute_details['sortable'] = false; // disable sorting on relational attributes
             }
             $this->config['attributes'][$attribute_details['attribute']] = $attribute_details;
         }
@@ -156,35 +164,30 @@ class AutoList {
         }
         return $value;
     }
-    
-    private function _really_sortable($attribute){
-        return !empty($attribute) // $sort_by param must not be empty
-                && $this->config['attributes'][$attribute]['sortable'] // $attribute must be sortable
-                && (is_null($this->config['attributes'][$attribute]['decoder']) || !is_null($this->config['attributes'][$attribute]['decoder_for_sql'])) // decoded attributes won't be sortable unless a decoder_for_sql is provided
-                && !$this->config['attributes'][$attribute]['relational']  // relational attributes won't be sortable
-                && !method_exists($this->model, "get_{$attribute}");
-    }
 
     public function set_query_modifier($query_modifier) {
         $this->query_modifier = $query_modifier;
     }
 
     public function render() {
-        $query   = $this->_get_query();
-        $sort_by = Input::query('sort_by', $this->config['default_sort']);
-        if ($this->_really_sortable($sort_by)) { // ignoring the computed attributes with sortable flag set
-            $sort_dir = Input::query('sort_dir');
-            if (empty($sort_dir)) {
-                $sort_dir = ($sort_by == $this->config['default_sort'] && !empty($this->config['default_sort_dir'])) ? $this->config['default_sort_dir'] : 'ASC';
+        $query          = $this->_get_query();
+        $active_sort_by = Input::query('sort_by', $this->config['default_sort']);
+        if (!empty($active_sort_by) && $this->config['attributes'][$active_sort_by]['sortable']) {
+            $active_sort_dir = Input::query('sort_dir');
+            if (empty($active_sort_dir)) {
+                $active_sort_dir = ($active_sort_by == $this->config['default_sort'] && !empty($this->config['default_sort_dir'])) ? $this->config['default_sort_dir'] : 'ASC';
             }
-            if (!is_null($this->config['attributes'][$sort_by]['decoder_for_sql'])) {
-                $decoder_for_sql = $this->config['attributes'][$sort_by]['decoder_for_sql'];
-                $sort_column     = is_callable($decoder_for_sql) ? $decoder_for_sql($sort_by) : $decoder_for_sql;
+            if (!is_null($this->config['attributes'][$active_sort_by]['decoder_for_sql'])) {
+                $decoder_for_sql = $this->config['attributes'][$active_sort_by]['decoder_for_sql'];
+                $sort_column     = is_callable($decoder_for_sql) ? $decoder_for_sql($active_sort_by) : $decoder_for_sql;
                 $sort_column     = DB::raw($sort_column);
             } else {
-                $sort_column = $sort_by;
+                $sort_column = $active_sort_by;
             }
-            $query = $query->order_by($sort_column, strtolower($sort_dir));
+            $query = $query->order_by($sort_column, strtolower($active_sort_dir));
+        } else {
+            $active_sort_by  = false;
+            $active_sort_dir = false;
         }
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
@@ -193,7 +196,7 @@ class AutoList {
         $page_links = FALSE;
         if ($paginate) {
             $pager = $query->paginate($per_page);
-            if (!empty($sort_by)) {
+            if (!empty($active_sort_by)) {
                 $pager->appends(compact('sort_by', 'sort_dir'));
             }
             $page_links = $pager->links();
@@ -262,17 +265,25 @@ class AutoList {
         }
 
         $header_columns = array();
+        $query_params   = Input::query();
+
         foreach ($this->config['attributes'] as $attribute => $attribute_details) {
-            if ($this->_really_sortable($attribute)) {
-                $query_params                       = Input::query();
-                $query_params['sort_by']            = $attribute_details['attribute'];
-                $query_params['sort_dir']           = 'ASC';
-                $attribute_details['sort_url_asc']  = URI::current() . "?" . http_build_query($query_params);
-                $query_params['sort_dir']           = 'DESC';
-                $attribute_details['sort_url_desc'] = URI::current() . "?" . http_build_query($query_params);
-            } else {
-                $attribute_details['sortable'] = false;
+            if ($attribute_details['sortable']) {
+
+                $attribute_details['active_sort_by']  = $active_sort_by;
+                $attribute_details['active_sort_dir'] = $active_sort_dir;
+
+                $current_link_params = $query_params;
+
+                $current_link_params['sort_by']  = $attribute;
+                $current_link_params['sort_dir'] = 'ASC';
+
+                $attribute_details['sort_url_asc'] = URL::to(URI::current() . "?" . http_build_query($current_link_params), Request::secure());
+
+                $current_link_params['sort_dir']    = 'DESC';
+                $attribute_details['sort_url_desc'] = URL::to(URI::current() . "?" . http_build_query($current_link_params), Request::secure());
             }
+
             $header_columns[$attribute] = render(Config::get('autolist::autolist.views.header_item'), $attribute_details);
         }
 

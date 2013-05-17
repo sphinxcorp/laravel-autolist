@@ -1,1 +1,0 @@
-<a id="{{ $action }}_{{ $id }}_{{ $attribute }}" class="autolist-action {{ $action }}" title="{{ e($raw_value) }}" href="{{ URL::to_action($controller_action,array($id)) }}">{{ $value }}</a>
