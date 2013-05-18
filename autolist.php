@@ -8,7 +8,7 @@ class AutoList {
     var $query_modifier = NULL;
 
     /**
-     * 
+     *
      * @param string $config_id A valid configuration id to autolist configuration
      * @param function $query_modifier An optional function to modify the model query just before result retrieval
      * @throws Exception
@@ -158,8 +158,7 @@ class AutoList {
             $link_url           = false;
             if (is_callable($attribute_details['linkify'])) {
                 $link_url = call_user_func($attribute_details['linkify'], $linked_model);
-            }
-            else if (!empty($attribute_details['relation_config'])) {
+            } else if (!empty($attribute_details['relation_config'])) {
                 $permission_check = isset($attribute_details['relation_config']['permission_check']) && is_callable($attribute_details['relation_config']['permission_check']) ? $attribute_details['relation_config']['permission_check'] : Config::get('autolist::autolist.permission_check');
                 list($related_detail_view_action, $related_detail_view_permission_check) = $this->_get_detail_view_action_details($attribute_details['relation_config']);
 
@@ -192,8 +191,9 @@ class AutoList {
     }
 
     public function render() {
+        $query_params   = Input::query();
         $query          = $this->_get_query();
-        $active_sort_by = Input::query('sort_by', $this->config['default_sort']);
+        $active_sort_by = isset($query_params['sort_by'])?$query_params['sort_by']:$this->config['default_sort'];
         if (!empty($active_sort_by) && $this->config['attributes'][$active_sort_by]['sortable']) {
             $active_sort_dir = Input::query('sort_dir');
             if (empty($active_sort_dir)) {
@@ -217,10 +217,10 @@ class AutoList {
 
         $page_links = FALSE;
         if ($paginate) {
-            $pager = $query->paginate($per_page);
-            if (!empty($active_sort_by)) {
-                $pager->appends(compact('sort_by', 'sort_dir'));
-            }
+            $pager              = $query->paginate($per_page);
+            $extra_query_params = $query_params;
+            unset($extra_query_params['page']);
+            $pager->appends($extra_query_params);
             $page_links = $pager->links();
             $items      = $pager->results;
         } else {
@@ -287,7 +287,6 @@ class AutoList {
         }
 
         $header_columns = array();
-        $query_params   = Input::query();
 
         foreach ($this->config['attributes'] as $attribute => $attribute_details) {
             if ($attribute_details['sortable']) {
