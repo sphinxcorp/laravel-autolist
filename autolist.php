@@ -120,7 +120,7 @@ class AutoList {
         if (!empty($eager_loads)) {
             $this->model->with($eager_loads);
         }
-
+        
         $query = $this->model;
 
         if (is_callable($this->query_modifier)) {
@@ -233,7 +233,9 @@ class AutoList {
 
         $permitted_items  = array();
         $has_item_actions = false;
+        
 
+        
         foreach ($items as $item) {
             if (!is_null($detail_view_permission_check) && !($detail_view_permission_check($item, $item->{$this->model_key}))) {
                 continue;
