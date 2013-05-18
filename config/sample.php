@@ -15,6 +15,8 @@ return array(
              *     'decoder' => function($value) { return $decoded_value; } // optional
              *     'decoder_for_sql' => string || function($attribute){ return $sql } // optional, if a field is not relational and decoded with decoder, then to make the list sortable by this attribute this option is used. The option value (or the returnded string from the function) will be directly used in the order by clause
              *     'sortable' => boolean, // default true, have no effect for relational attributes, those van not be used for sorting
+             *     'expose_filter' => boolean, // default false // :TODO
+             *     'filter_type' => ['string', 'number', 'date'] // default 'string', // :TODO
              * ),
              */
             'username' => array(

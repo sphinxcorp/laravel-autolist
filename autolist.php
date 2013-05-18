@@ -23,24 +23,28 @@ class AutoList {
     }
 
     private function _get_attribute_details($attribute, $options) {
-        $sortable        = true;
-        $linkify         = true;
-        $auto_escape     = true;
-        $decoder         = null;
+        $sortable = true;
+        $linkify = true;
+        $auto_escape = true;
+        $decoder = null;
         $decoder_for_sql = null;
-        $relational      = false;
+        $relational = false;
         $relation_config = null;
+        $expose_filter = false;
+        $filter_type = 'string';
         if (is_int($attribute) && is_string($options)) {
             $attribute = $options;
-            $title     = ucwords(str_replace('_', ' ', $attribute));
+            $title = ucwords(str_replace('_', ' ', $attribute));
         } else if (is_array($options)) {
-            $sortable        = isset($options['sortable']) ? $options['sortable'] : $sortable;
-            $linkify         = isset($options['linkify']) ? $options['linkify'] : $linkify;
-            $auto_escape     = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
-            $title           = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
-            $decoder         = isset($options['decoder']) && is_callable($options['decoder']) ? $options['decoder'] : NULL;
+            $sortable = isset($options['sortable']) ? $options['sortable'] : $sortable;
+            $linkify = isset($options['linkify']) ? $options['linkify'] : $linkify;
+            $auto_escape = isset($options['auto_escape']) ? $options['auto_escape'] : $auto_escape;
+            $title = isset($options['title']) ? $options['title'] : ucwords(str_replace('_', ' ', $attribute));
+            $decoder = isset($options['decoder']) && is_callable($options['decoder']) ? $options['decoder'] : NULL;
             $decoder_for_sql = isset($options['decoder_for_sql']) ? $options['decoder_for_sql'] : NULL;
             $relation_config = isset($options['relation_config']) ? Config::get($options['relation_config'], NULL) : NULL;
+            $expose_filter = isset($options['expose_filter']) ? $options['expose_filter'] : $expose_filter;
+            $filter_type = isset($options['filter_type']) ? $options['filter_type'] : $filter_type;
         } else if (is_string($options)) {
             $title = $options;
         }
@@ -52,24 +56,24 @@ class AutoList {
                 && (is_null($decoder) || !is_null($decoder_for_sql)) // decoded attributes won't be sortable unless a decoder_for_sql is provided
                 && !method_exists($this->model, "get_{$attribute}"); // computed fields are not sortabe
 
-        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'decoder_for_sql', 'relational', 'relation_config');
+        return compact('attribute', 'title', 'sortable', 'linkify', 'auto_escape', 'decoder', 'decoder_for_sql', 'relational', 'relation_config', 'expose_filter', 'filter_type');
     }
 
     private function _get_action_details($action, $options) {
         if (is_string($options)) {
             if (is_int($action)) {
                 $action = $options;
-                $text   = $title  = ucwords(str_replace('_', ' ', $action));
+                $text = $title = ucwords(str_replace('_', ' ', $action));
             } else {
-                $text  = $title = ucwords($options);
+                $text = $title = ucwords($options);
             }
             $controller_action = $this->config['action_controller'] . "@$action";
-            $permission_check  = NULL;
+            $permission_check = NULL;
         } else if (is_string($action) && is_array($options)) {
-            $text              = $options['text']? : ($options['title']? : ucwords(str_replace('_', ' ', $action)));
-            $title             = $options['title']? : $text;
+            $text = $options['text']? : ($options['title']? : ucwords(str_replace('_', ' ', $action)));
+            $title = $options['title']? : $text;
             $controller_action = isset($options['controller_action']) ? $options['controller_action'] : $this->config['action_controller'] . "@$action";
-            $permission_check  = isset($options['permission_check']) ? $options['permission_check'] : NULL;
+            $permission_check = isset($options['permission_check']) ? $options['permission_check'] : NULL;
         } else {
             throw new Exception('Invalid configuration provided for action');
         }
@@ -78,7 +82,7 @@ class AutoList {
     }
 
     private function _get_detail_view_action_details($config) {
-        $action           = Config::get('autolist::autolist.detail_view_action_default', 'detail');
+        $action = Config::get('autolist::autolist.detail_view_action_default', 'detail');
         $permission_check = NULL;
 
         if (isset($config['detail_view_action'])) {
@@ -99,20 +103,20 @@ class AutoList {
     }
 
     private function _get_query() {
-        $model_class                = $this->config['model'];
-        $this->model                = new $model_class;
-        $this->model_key            = $model_class::$key;
-        $attributes                 = $this->config['attributes'];
-        $eager_loads                = is_array($this->config['eager_loads']) ? $this->config['eager_loads'] : array();
+        $model_class = $this->config['model'];
+        $this->model = new $model_class;
+        $this->model_key = $model_class::$key;
+        $attributes = $this->config['attributes'];
+        $eager_loads = is_array($this->config['eager_loads']) ? $this->config['eager_loads'] : array();
         $this->config['attributes'] = array();
         foreach ($attributes as $attribute => $options) {
             $attribute_details = $this->_get_attribute_details($attribute, $options);
-            $parts             = explode('.', $attribute);
+            $parts = explode('.', $attribute);
             if (count($parts) > 1) {
                 array_pop($parts);
                 $attribute_details['relational'] = true;
-                $eager_loads[]                   = $attribute_details['relation']   = implode('.', $parts);
-                $attribute_details['sortable']   = false; // disable sorting on relational attributes
+                $eager_loads[] = $attribute_details['relation'] = implode('.', $parts);
+                $attribute_details['sortable'] = false; // disable sorting on relational attributes
             }
             $this->config['attributes'][$attribute_details['attribute']] = $attribute_details;
         }
@@ -120,7 +124,7 @@ class AutoList {
         if (!empty($eager_loads)) {
             $this->model->with($eager_loads);
         }
-        
+
         $query = $this->model;
 
         if (is_callable($this->query_modifier)) {
@@ -136,8 +140,8 @@ class AutoList {
     }
 
     private function _get_attribute_value($item, $attribute_details, $detail_view_action) {
-        $value_store     = $item;
-        $raw_value       = NULL;
+        $value_store = $item;
+        $raw_value = NULL;
         $attribute_parts = explode('.', $attribute_details['attribute']);
         foreach ($attribute_parts as $part) {
             $raw_value = $value_store->$part;
@@ -153,9 +157,9 @@ class AutoList {
 
         $value = $attribute_details['auto_escape'] ? e($raw_value) : $raw_value;
         if ($attribute_details['linkify'] && !empty($raw_value)) {
-            $linked_model       = $value_store;
+            $linked_model = $value_store;
             $linked_model_class = get_class($linked_model);
-            $link_url           = false;
+            $link_url = false;
             if (is_callable($attribute_details['linkify'])) {
                 $link_url = call_user_func($attribute_details['linkify'], $linked_model);
             } else if (!empty($attribute_details['relation_config'])) {
@@ -174,16 +178,81 @@ class AutoList {
             }
             if (!empty($link_url)) {
                 $value = render(Config::get('autolist::autolist.views.detail_link'), array(
-                    'id'        => $item->{$this->model_key},
+                    'id' => $item->{$this->model_key},
                     'attribute' => $attribute_details['attribute'],
-                    'action'    => $detail_view_action,
+                    'action' => $detail_view_action,
                     'raw_value' => $raw_value,
-                    'value'     => $value,
-                    'url'       => $link_url
+                    'value' => $value,
+                    'url' => $link_url
                 ));
             }
         }
         return $value;
+    }
+
+    private function _find_filter_operator($filter, $operator_string) {
+        $operators = array(
+            'eq' => '=',
+            'neq' => '!=',
+            'sw' => 'LIKE',
+            'cont' => 'LIKE',
+            'ew' => 'LIKE',
+            'lt' => '<',
+            'gt' => '>',
+            'btn' => 'BETWEEN',
+            'enum' => 'IN'
+        );
+        $filter_operators = array(
+            'string' => array('eq', 'neq', 'sw', 'cont', 'ew'),
+            'number' => array('eq', 'neq', 'lt', 'gt', 'btn'),
+            'integer' => array('eq', 'neq', 'lt', 'gt', 'btn'),
+            'date' => array('eq', 'neq', 'lt', 'gt', 'btn'),
+            'enum' => array('enum')
+        );
+        if (in_array($operator_string, $filter_operators[$filter])) {
+            return $operators[$operator_string];
+        } else {
+            return NULL;
+        }
+    }
+
+    private function _validate_filter_string($filter, $operator_string, $filter_string) {
+
+        $rules = array(
+            'ibtn' => array(
+                'filter_string' => 'match:/[0-9]+,[0-9]+/'
+            ),
+            'fbtn' => array(
+                'filter_string' => 'match:/([0-9].[0.9])+,([0-9].[0-9])+/'
+            ),
+            'string' => array(
+                'filter_string' => 'alpha_dash'
+            ),
+            'numeric' => array(
+                'filter_string' => 'numeric'
+            ),
+            'integer' => array(
+                'filter_string' => 'integer'
+            ),
+            'in' => array(
+                'filter_string' => 'match:/([:alnum:])(,[:alnum:])*/'
+            )
+        );
+
+        $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['dash'];
+        $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['numeric'];
+        $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer'];
+        $rules['number_btn'] = $rules['fbtn'];
+        $rules['integer_btn'] = $rules['ibtn'];
+
+
+        $operator_rules = $rules[$filter . '_' . $filter_string];
+        $validate = Validator::make(array('filter_string' => $operator_string), $operator_rules);
+        if ($validate->fails()) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     public function set_query_modifier($query_modifier) {
@@ -191,9 +260,9 @@ class AutoList {
     }
 
     public function render() {
-        $query_params   = Input::query();
-        $query          = $this->_get_query();
-        $active_sort_by = isset($query_params['sort_by'])?$query_params['sort_by']:$this->config['default_sort'];
+        $query_params = Input::query();
+        $query = $this->_get_query();
+        $active_sort_by = isset($query_params['sort_by']) ? $query_params['sort_by'] : $this->config['default_sort'];
         if (!empty($active_sort_by) && $this->config['attributes'][$active_sort_by]['sortable']) {
             $active_sort_dir = Input::query('sort_dir');
             if (empty($active_sort_dir)) {
@@ -201,15 +270,40 @@ class AutoList {
             }
             if (!is_null($this->config['attributes'][$active_sort_by]['decoder_for_sql'])) {
                 $decoder_for_sql = $this->config['attributes'][$active_sort_by]['decoder_for_sql'];
-                $sort_column     = is_callable($decoder_for_sql) ? $decoder_for_sql($active_sort_by) : $decoder_for_sql;
-                $sort_column     = DB::raw($sort_column);
+                $sort_column = is_callable($decoder_for_sql) ? $decoder_for_sql($active_sort_by) : $decoder_for_sql;
+                $sort_column = DB::raw($sort_column);
             } else {
                 $sort_column = $active_sort_by;
             }
             $query = $query->order_by($sort_column, strtolower($active_sort_dir));
         } else {
-            $active_sort_by  = false;
+            $active_sort_by = false;
             $active_sort_dir = false;
+        }
+
+        $active_filter = isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL;
+        if (isset($this->config['attributes'][$active_filter]['decoder_for_sql']))
+            $active_filter = is_callable($this->config['attributes'][$active_filter]['decoder_for_sql'])?$this->config['attributes'][$active_filter]['decoder_for_sql']():$this->config['attributes'][$active_filter]['decoder_for_sql'];
+        else
+            $active_filter = NULL;
+        $active_filter_operator = isset($query_params['filter_operator']) ? $query_params['filter_operator'] : NULL;
+        $active_filter_string = isset($query_params['filter_string']) ? $query_params['filter_string'] : NULL;
+        if ($active_filter != NULL && $active_filter_operator != NULL && $this->_find_filter_operator($active_filter, $active_filter_operator) != NULL) {
+            $filter_operator = $this->_find_filter_operator($active_filter, $active_filter_operator);
+
+            $valid = $this->_validate_filter_string($active_filter, $active_filter_string, $filter_operator);
+
+            if ($valid) {
+                if ($active_filter_operator == 'sw') {
+                    $query = $query->where($active_filter,$filter_operator,$active_filter_string.'%');
+                } else if ($active_filter_operator == 'ew') {
+                    $query = $query->where($active_filter,$filter_operator,'%'.$active_filter_string);
+                } else if ($active_filter_operator == 'cont') {
+                    $query = $query->where($active_filter,$filter_operator,'%'.$active_filter_string.'%');
+                } else if ($active_filter_operator == 'btn') {
+                    $query = $query->where_between($active_filter,explode(',',$active_filter_string));
+                }
+            }
         }
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
@@ -217,12 +311,12 @@ class AutoList {
 
         $page_links = FALSE;
         if ($paginate) {
-            $pager              = $query->paginate($per_page);
+            $pager = $query->paginate($per_page);
             $extra_query_params = $query_params;
             unset($extra_query_params['page']);
             $pager->appends($extra_query_params);
             $page_links = $pager->links();
-            $items      = $pager->results;
+            $items = $pager->results;
         } else {
             $items = $query->get();
         }
@@ -231,11 +325,11 @@ class AutoList {
 
         list($detail_view_action, $detail_view_permission_check) = $this->_get_detail_view_action_details($this->config);
 
-        $permitted_items  = array();
+        $permitted_items = array();
         $has_item_actions = false;
-        
 
-        
+
+
         foreach ($items as $item) {
             if (!is_null($detail_view_permission_check) && !($detail_view_permission_check($item, $item->{$this->model_key}))) {
                 continue;
@@ -245,19 +339,19 @@ class AutoList {
 
             $action_links = array();
             foreach ($this->config['item_actions'] as $action => $action_options) {
-                $action_details   = $this->_get_action_details($action, $action_options);
+                $action_details = $this->_get_action_details($action, $action_options);
                 $action_permitted = true;
                 if (is_callable($action_details['permission_check'])) {
                     $action_permission_check = $action_details['permission_check'];
-                    $action_permitted        = $action_permission_check($item, $item->{$this->model_key});
+                    $action_permitted = $action_permission_check($item, $item->{$this->model_key});
                 } else if (is_callable($permission_check)) {
                     $action_permitted = $permission_check($action_details['action'], $item, $item->{$this->model_key});
                 }
 
                 if ($action_permitted) {
-                    $action_details['id']                    = $item->{$this->model_key};
+                    $action_details['id'] = $item->{$this->model_key};
                     $action_links[$action_details['action']] = render(Config::get('autolist::autolist.views.action_link'), $action_details);
-                    $has_item_actions                        = true;
+                    $has_item_actions = true;
                 }
             }
 
@@ -278,12 +372,12 @@ class AutoList {
             $action_permitted = true;
             if (is_callable($action_details['permission_check'])) {
                 $action_permission_check = $action_details['permission_check'];
-                $action_permitted        = $action_permission_check($item);
+                $action_permitted = $action_permission_check($item);
             } else if (is_callable($permission_check)) {
                 $action_permitted = $permission_check($action_details['action'], $item);
             }
             if ($action_permitted) {
-                $action_details['id']                           = NULL;
+                $action_details['id'] = NULL;
                 $global_action_links[$action_details['action']] = render(Config::get('autolist::autolist.views.action_link'), $action_details);
             }
         }
@@ -293,17 +387,17 @@ class AutoList {
         foreach ($this->config['attributes'] as $attribute => $attribute_details) {
             if ($attribute_details['sortable']) {
 
-                $attribute_details['active_sort_by']  = $active_sort_by;
+                $attribute_details['active_sort_by'] = $active_sort_by;
                 $attribute_details['active_sort_dir'] = $active_sort_dir;
 
                 $current_link_params = $query_params;
 
-                $current_link_params['sort_by']  = $attribute;
+                $current_link_params['sort_by'] = $attribute;
                 $current_link_params['sort_dir'] = 'ASC';
 
                 $attribute_details['sort_url_asc'] = URL::to(URI::current() . "?" . http_build_query($current_link_params), Request::secure());
 
-                $current_link_params['sort_dir']    = 'DESC';
+                $current_link_params['sort_dir'] = 'DESC';
                 $attribute_details['sort_url_desc'] = URL::to(URI::current() . "?" . http_build_query($current_link_params), Request::secure());
             }
 
@@ -312,12 +406,12 @@ class AutoList {
 
 
         $list_data = array(
-            'title'               => $this->config['title'],
-            'header_columns'      => $header_columns,
-            'has_item_actions'    => $has_item_actions,
-            'items'               => $permitted_items,
+            'title' => $this->config['title'],
+            'header_columns' => $header_columns,
+            'has_item_actions' => $has_item_actions,
+            'items' => $permitted_items,
             'global_action_links' => $global_action_links,
-            'page_links'          => $page_links,
+            'page_links' => $page_links,
         );
         return render(Config::get('autolist::autolist.views.list'), $list_data);
     }
