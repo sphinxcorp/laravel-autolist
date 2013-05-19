@@ -190,7 +190,8 @@ class AutoList {
         return $value;
     }
 
-    private function _find_filter_operator($filter, $operator_string) {
+    private function _find_filter_operator($filter, $operator) {
+        
         $operators = array(
             'eq' => '=',
             'neq' => '!=',
@@ -200,58 +201,68 @@ class AutoList {
             'lt' => '<',
             'gt' => '>',
             'btn' => 'BETWEEN',
-            'enum' => 'IN'
+            'in' => 'IN'
         );
         $filter_operators = array(
-            'string' => array('eq', 'neq', 'sw', 'cont', 'ew'),
+            'string' => array('eq','neq','sw', 'cont', 'ew'),
             'number' => array('eq', 'neq', 'lt', 'gt', 'btn'),
             'integer' => array('eq', 'neq', 'lt', 'gt', 'btn'),
-            'date' => array('eq', 'neq', 'lt', 'gt', 'btn'),
-            'enum' => array('enum')
+            'date' => array('eq','neq','lt', 'gt', 'btn'),
+            'enum' => array('in')
         );
-        if (in_array($operator_string, $filter_operators[$filter])) {
-            return $operators[$operator_string];
+        if (in_array($operator, $filter_operators[$filter])) {
+            return $operators[$operator];
         } else {
-            return NULL;
+            return NULL;   
         }
     }
 
-    private function _validate_filter_string($filter, $operator_string, $filter_string) {
+    private function _validate_filter_string($filter, $operator, $filter_string) {
 
         $rules = array(
             'ibtn' => array(
-                'filter_string' => 'match:/[0-9]+,[0-9]+/'
+                'filter_string' => '/^[1-9][0-9]*,[1-9][0-9]*$/'
             ),
-            'fbtn' => array(
-                'filter_string' => 'match:/([0-9].[0.9])+,([0-9].[0-9])+/'
+            'nbtn' => array(
+                'filter_string' => '/^([0-9]*.[0.9]+),([0-9]*.[0-9]+)$/'
             ),
             'string' => array(
-                'filter_string' => 'alpha_dash'
+                'filter_string' => '/^[0-9a-zA-Z]+$/'
             ),
             'numeric' => array(
-                'filter_string' => 'numeric'
+                'filter_string' => '/^[0-9]*.[0.9]+$/'
             ),
             'integer' => array(
-                'filter_string' => 'integer'
+                'filter_string' => '/^[1-9][0-9]*$/'
             ),
-            'in' => array(
-                'filter_string' => 'match:/([:alnum:])(,[:alnum:])*/'
+            'strin' => array(
+                'filter_string' => '/^([0-9a-zA-Z]+)(,[0-9a-zA-Z]+)*$/'
+            ),
+            'intin' => array(
+                'filter_string' => '/^([1-9][0-9]*)(,[1-9][0-9]*)*$/'
+            ),
+            'numin' => array(
+                'filter_string' => '/^[0-9]*.[0.9]+(,[0-9]*.[0.9]+)*$/'
             )
         );
 
-        $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['dash'];
+        $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['string'];
+        $rules['string_enum'] = $rules['strin'];
         $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['numeric'];
+        $rules['number_enum'] = $rules['numin'];
         $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer'];
-        $rules['number_btn'] = $rules['fbtn'];
+        $rules['integer_enum'] = $rules['intin'];
+        $rules['number_btn'] = $rules['nbtn'];
         $rules['integer_btn'] = $rules['ibtn'];
+        
 
 
-        $operator_rules = $rules[$filter . '_' . $filter_string];
-        $validate = Validator::make(array('filter_string' => $operator_string), $operator_rules);
-        if ($validate->fails()) {
-            return false;
-        } else {
+        $operator_rules = $rules[$filter . '_' . $operator]['filter_string'];
+        
+        if (preg_match($operator_rules, $filter_string)) {
             return true;
+        } else {
+            return false;
         }
     }
 
@@ -280,30 +291,49 @@ class AutoList {
             $active_sort_by = false;
             $active_sort_dir = false;
         }
-
-        $active_filter = isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL;
-        if (isset($this->config['attributes'][$active_filter]['decoder_for_sql']))
-            $active_filter = is_callable($this->config['attributes'][$active_filter]['decoder_for_sql'])?$this->config['attributes'][$active_filter]['decoder_for_sql']():$this->config['attributes'][$active_filter]['decoder_for_sql'];
-        else
-            $active_filter = NULL;
-        $active_filter_operator = isset($query_params['filter_operator']) ? $query_params['filter_operator'] : NULL;
-        $active_filter_string = isset($query_params['filter_string']) ? $query_params['filter_string'] : NULL;
-        if ($active_filter != NULL && $active_filter_operator != NULL && $this->_find_filter_operator($active_filter, $active_filter_operator) != NULL) {
-            $filter_operator = $this->_find_filter_operator($active_filter, $active_filter_operator);
-
-            $valid = $this->_validate_filter_string($active_filter, $active_filter_string, $filter_operator);
-
-            if ($valid) {
-                if ($active_filter_operator == 'sw') {
-                    $query = $query->where($active_filter,$filter_operator,$active_filter_string.'%');
-                } else if ($active_filter_operator == 'ew') {
-                    $query = $query->where($active_filter,$filter_operator,'%'.$active_filter_string);
-                } else if ($active_filter_operator == 'cont') {
-                    $query = $query->where($active_filter,$filter_operator,'%'.$active_filter_string.'%');
-                } else if ($active_filter_operator == 'btn') {
-                    $query = $query->where_between($active_filter,explode(',',$active_filter_string));
+        
+        
+        $active_filter = isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL; //If filter is asked for a field
+        
+        if (!is_null($active_filter) && isset($this->config['attributes'][$active_filter]['expose_filter']) && $this->config['attributes'][$active_filter]['expose_filter'] == true) { // If filter for that certain field is exposed
+            
+            $active_filter_type = isset($this->config['attributes'][$active_filter]['filter_type']) ? $this->config['attributes'][$active_filter]['filter_type'] : NULL; // The configured filter type ['string','integer','number','date',array()]
+            
+            if (isset($this->config['attributes'][$active_filter]['decoder_for_sql']))
+                $filter = is_callable($this->config['attributes'][$active_filter]['decoder_for_sql'])?$this->config['attributes'][$active_filter]['decoder_for_sql']():$this->config['attributes'][$active_filter]['decoder_for_sql'];
+            else
+                $filter = NULL;
+            
+            $active_filter_operator = isset($query_params['filter_operator']) ? $query_params['filter_operator'] : NULL;
+            $active_filter_string = isset($query_params['filter_string']) ? $query_params['filter_string'] : NULL;
+            
+            //if ($filter != NULL && $active_filter != NULL && $active_filter_type!=NULL && $active_filter_operator != NULL && $this->_find_filter_operator($active_filter_type, $active_filter_operator) != NULL) {
+                $filter_operator = $this->_find_filter_operator($active_filter_type, $active_filter_operator);
+               
+                $valid = $this->_validate_filter_string($active_filter_type, $active_filter_operator, $active_filter_string);
+                
+                if ($valid) {
+                    if ( is_null($active_filter_string) || empty($active_filter_string) ) {
+                        $query = $query->where_null($filter);
+                    } else if ($active_filter_operator == 'sw') {
+                        $query = $query->where($filter,$filter_operator,$active_filter_string.'%');
+                    } else if ($active_filter_operator == 'ew') {
+                        $query = $query->where($filter,$filter_operator,'%'.$active_filter_string);
+                    } else if ($active_filter_operator == 'cont') {
+                        $query = $query->where($filter,$filter_operator,'%'.$active_filter_string.'%');
+                    } else if ($active_filter_operator == 'btn') {
+                        $query = $query->where_between($filter,explode(',',$active_filter_string));
+                    } else if ($active_filter_operator == 'enum') {
+                        $query = $query->where_in($filter, explode(',',$active_filter_string));
+                    } else if ($active_filter_operator == 'eq' 
+                            || $active_filter_operator == 'neq'
+                            || $active_filter_operator == 'gt'
+                            || $active_filter_operator == 'lt') {
+                        $query = $query->where($filter, $filter_operator, $active_filter_string);
+                    }
+                    
                 }
-            }
+            //}
         }
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
