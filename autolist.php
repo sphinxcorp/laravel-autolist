@@ -200,60 +200,54 @@ class AutoList {
             'ew' => 'LIKE',
             'lt' => '<',
             'gt' => '>',
-            'btn' => 'BETWEEN',
-            'in' => 'IN'
+            'btn' => 'BETWEEN'
         );
         $filter_operators = array(
             'string' => array('eq','neq','sw', 'cont', 'ew'),
             'number' => array('eq', 'neq', 'lt', 'gt', 'btn'),
             'integer' => array('eq', 'neq', 'lt', 'gt', 'btn'),
             'date' => array('eq','neq','lt', 'gt', 'btn'),
-            'enum' => array('in')
+            'enum' => array('eq','neq')
         );
         if (in_array($operator, $filter_operators[$filter])) {
             return $operators[$operator];
         } else {
+            
             return NULL;   
         }
     }
 
     private function _validate_filter_string($filter, $operator, $filter_string) {
-
+        
         $rules = array(
-            'ibtn' => array(
-                'filter_string' => '/^[1-9][0-9]*,[1-9][0-9]*$/'
-            ),
-            'nbtn' => array(
-                'filter_string' => '/^([0-9]*.[0.9]+),([0-9]*.[0-9]+)$/'
-            ),
+//            'ibtn' => array(
+//                'filter_string' => '/^[1-9][0-9]*,[1-9][0-9]*$/'
+//            ),
+//            'nbtn' => array(
+//                'filter_string' => '/^([0-9]*.[0.9]+),([0-9]*.[0-9]+)$/'
+//            ),
             'string' => array(
-                'filter_string' => '/^[0-9a-zA-Z]+$/'
+                'filter_string' => '/^[0-9a-zA-Z]*(,[0-9a-zA-Z]+)*$/'
             ),
             'numeric' => array(
-                'filter_string' => '/^[0-9]*.[0.9]+$/'
+                'filter_string' => '/^([0-9]*.[0.9]+)+(,[0-9]*.[0.9]+)*$/'
             ),
             'integer' => array(
-                'filter_string' => '/^[1-9][0-9]*$/'
+                'filter_string' => '/^[1-9][0-9]*(,[1-9][0-9]*)*$/'
             ),
-            'strin' => array(
-                'filter_string' => '/^([0-9a-zA-Z]+)(,[0-9a-zA-Z]+)*$/'
-            ),
-            'intin' => array(
-                'filter_string' => '/^([1-9][0-9]*)(,[1-9][0-9]*)*$/'
-            ),
-            'numin' => array(
-                'filter_string' => '/^[0-9]*.[0.9]+(,[0-9]*.[0.9]+)*$/'
+            'date' => array(
+                'filter_string' => '/^[0-9]+-[0-9]+-[0-9]\s[0-9]+:[0-9]+:[0-9]+(,[0-9]+-[0-9]+-[0-9]\s[0-9]+:[0-9]+:[0-9]+)*$/'
             )
         );
 
         $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['string'];
-        $rules['string_enum'] = $rules['strin'];
-        $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['numeric'];
-        $rules['number_enum'] = $rules['numin'];
-        $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer'];
-        $rules['integer_enum'] = $rules['intin'];
-        $rules['number_btn'] = $rules['nbtn'];
-        $rules['integer_btn'] = $rules['ibtn'];
+        $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['number_btn'] = $rules['numeric'];
+        $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer_btn'] = $rules['integer'];
+        $rules['enum_eq'] = $rules['enum_neq'] = $rules['string'];
+        //$rules['in_eq'] = $rules['in_neq'] = $rules['string'];
+        $rules['date_eq'] = $rules['date_neq'] = $rules['date_gt'] = $rules['date_lt'] = $rules['date_btn'] = $rules['date']; 
+        
+        
         
 
 
@@ -262,8 +256,16 @@ class AutoList {
         if (preg_match($operator_rules, $filter_string)) {
             return true;
         } else {
+            //echo "Not found";
             return false;
         }
+    }
+    
+    private function _filter_enabled($filter_by) {
+        if ($this->config['attributes'][$filter_by]['sortable'] == true 
+                && $this->config['attributes'][$filter_by]['expose_filter'] == true
+                && isset($this->config['attributes'][$filter_by]['filter_type'])) return true;
+        return false;
     }
 
     public function set_query_modifier($query_modifier) {
@@ -292,49 +294,134 @@ class AutoList {
             $active_sort_dir = false;
         }
         
+        /* ----------- Filtering start */
         
-        $active_filter = isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL; //If filter is asked for a field
         
-        if (!is_null($active_filter) && isset($this->config['attributes'][$active_filter]['expose_filter']) && $this->config['attributes'][$active_filter]['expose_filter'] == true) { // If filter for that certain field is exposed
+        $filter_fields = array();
+        foreach($this->config['attributes'] as $config) {
+            if ($this->_filter_enabled($config['attribute']) == true) {
+                $filter_fields[$config['attribute']] = $config; 
+            }
+        }
+        $filter_operators = array(
+            'string'    => array(
+                'eq'    => 'st',
+                'neq'   => 'st',
+                'sw'    => 'st',
+                'ew'    => 'st',
+                'cont'  => 'st'
+            ),
+            'integer'   => array(
+                'eq'    => 'st',
+                'neq'   => 'st',
+                'lt'    => 'st',
+                'gt'    => 'st',
+                'btn'   => 'dt'
+            ),
+            'number'    => array(
+                'eq'    => 'st',
+                'neq'   => 'st',
+                'lt'    => 'st',
+                'gt'    => 'st',
+                'btn'   => 'dt'
+            ),
+            'date'      => array(
+                'eq'    => 'st',
+                'neq'   => 'st',
+                'lt'    => 'st',
+                'gt'    => 'st',
+                'btn'   => 'dt'
+            ),
+            'enum'      => array(
+                'eq'    => 'select',
+                'neq'   => 'select'
+            )
+        );
+        
+        
+        
+        $filter_by = ( isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL ); // Check if filter is asked for
+        $filter_operator = ( isset($query_params['filter_op']) ? $query_params['filter_op'] : NULL ); // Check if any operator is set
+        $filter_string = ( isset($query_params['filter_str']) ? $query_params['filter_str'] : NULL );
+        
+        
+        if ( !is_null($filter_by) && !is_null($filter_operator) && $this->_filter_enabled($filter_by) ) { // Filter has been asked for
+            $configs = $this->config['attributes']; // Fetched the configs to shorten lines
             
-            $active_filter_type = isset($this->config['attributes'][$active_filter]['filter_type']) ? $this->config['attributes'][$active_filter]['filter_type'] : NULL; // The configured filter type ['string','integer','number','date',array()]
-            
-            if (isset($this->config['attributes'][$active_filter]['decoder_for_sql']))
-                $filter = is_callable($this->config['attributes'][$active_filter]['decoder_for_sql'])?$this->config['attributes'][$active_filter]['decoder_for_sql']():$this->config['attributes'][$active_filter]['decoder_for_sql'];
-            else
-                $filter = NULL;
-            
-            $active_filter_operator = isset($query_params['filter_operator']) ? $query_params['filter_operator'] : NULL;
-            $active_filter_string = isset($query_params['filter_string']) ? $query_params['filter_string'] : NULL;
-            
-            //if ($filter != NULL && $active_filter != NULL && $active_filter_type!=NULL && $active_filter_operator != NULL && $this->_find_filter_operator($active_filter_type, $active_filter_operator) != NULL) {
-                $filter_operator = $this->_find_filter_operator($active_filter_type, $active_filter_operator);
-               
-                $valid = $this->_validate_filter_string($active_filter_type, $active_filter_operator, $active_filter_string);
+            $active_filter_by = NULL;
+            if ( isset($configs[$filter_by]['decoder_for_sql']) ) {
+                $active_filter_by = ( is_callable($configs[$filter_by]['decoder_for_sql']) ? $configs[$filter_by]['decoder_for_sql']($filter_by) : $configs[$filter_by]['decoder_for_sql'] );
+                $active_filter_by = DB::raw($active_filter_by);
                 
-                if ($valid) {
-                    if ( is_null($active_filter_string) || empty($active_filter_string) ) {
-                        $query = $query->where_null($filter);
-                    } else if ($active_filter_operator == 'sw') {
-                        $query = $query->where($filter,$filter_operator,$active_filter_string.'%');
-                    } else if ($active_filter_operator == 'ew') {
-                        $query = $query->where($filter,$filter_operator,'%'.$active_filter_string);
-                    } else if ($active_filter_operator == 'cont') {
-                        $query = $query->where($filter,$filter_operator,'%'.$active_filter_string.'%');
-                    } else if ($active_filter_operator == 'btn') {
-                        $query = $query->where_between($filter,explode(',',$active_filter_string));
-                    } else if ($active_filter_operator == 'enum') {
-                        $query = $query->where_in($filter, explode(',',$active_filter_string));
-                    } else if ($active_filter_operator == 'eq' 
-                            || $active_filter_operator == 'neq'
-                            || $active_filter_operator == 'gt'
-                            || $active_filter_operator == 'lt') {
-                        $query = $query->where($filter, $filter_operator, $active_filter_string);
+            }
+            
+            $active_filter_type = NULL; // Default filter field is NULL
+            if ( $configs[$filter_by]['expose_filter'] == true ) { // Check if filtering on that column is allowed
+                $active_filter_type = $configs[$filter_by]['filter_type']; // Fetched the configured filter_type
+                if ( is_array($active_filter_type) ) { // Decisive, array() = enumerated list, non_array = defined type
+                    $active_filter_type = 'enum'; // Set the filter type to enum for further compatibility
+                }
+            }
+            
+            
+            $active_filter_operator = NULL; // Default filter operator is NULL
+            if ( !is_null($active_filter_type) ) { // Filter is valid
+                $active_filter_operator = $this->_find_filter_operator($active_filter_type, $filter_operator); // Operator that is going to be used in querries
+            }
+            
+            
+            if ( !is_null($active_filter_by) && !is_null($active_filter_type) && !is_null($active_filter_operator) ) { // Filter is applicable if valid query is found
+                $is_valid = false; // Default
+                $is_valid = $this->_validate_filter_string($active_filter_type, $filter_operator, $filter_string); //validate input string
+                if ($active_filter_type == 'string' || $active_filter_type == 'date') { // For string and date data types, exceptions are applied
+                    $is_valid = true;
+                }
+
+                if ($is_valid) {
+                    
+                    
+                    if ($active_filter_type != 'enum') { // 'string','integer','date','number'
+                        $active_filter_list = explode(',',$filter_string);
+                    } else { // 'enum'(array())
+                        $active_filter_list = array();
+                        $enum_filter_list = array();
+                        foreach($configs[$filter_by]['filter_type'] as $value => $label) {
+                            $enum_filter_list[] = "$value";
+                        }
+                        foreach(explode(',',$filter_string) as $string) {
+                            if (in_array($string,$enum_filter_list)) {
+                                $active_filter_list[] = $string;
+                            }
+                        }
                     }
                     
+                    if (is_null($filter_string) || empty($filter_string)) { //
+                        if ($active_filter_type == 'date') {
+                            $filter_string = '0000-00-00 00:00:00';
+                        }
+                        $query = $query->where_null($active_filter_by)
+                                       ->or_where($active_filter_by,$active_filter_operator,$filter_string);
+                    } else if (count($active_filter_list)>0) {
+                        if ($active_filter_operator == '=') {
+                            $query = $query->where_in($active_filter_by,$active_filter_list);
+                        } else if ($active_filter_operator == '!=') {
+                            $query = $query->where_not_in($active_filter_by, $active_filter_list);
+                        } else if ($active_filter_operator != 'BETWEEN') {
+                            foreach($active_filter_list as $active_filter_string) {
+                                if ($filter_operator == 'sw') $active_filter_string = $active_filter_string . '%';
+                                else if ($filter_operator == 'ew') $active_filter_string = '%' . $active_filter_string;
+                                else if ($filter_operator == 'cont') $active_filter_string = '%' . $active_filter_string . '%';
+                                $query = $query->or_where($active_filter_by,$active_filter_operator,$active_filter_string);
+                            }
+                        } else {
+                            $query = $query->where_between($active_filter_by,$active_filter_list[0],$active_filter_list[1]);
+                        }
+                    }
                 }
-            //}
+            }
         }
+        /* ----------- Filtering end */
+        
 
         $paginate = isset($this->config['pager_enabled']) ? $this->config['pager_enabled'] : Config::get('autolist::autolist.pager_enabled', true);
         $per_page = isset($this->config['page_size']) ? $this->config['page_size'] : Config::get('autolist::autolist.page_size', 10);
@@ -442,6 +529,8 @@ class AutoList {
             'items' => $permitted_items,
             'global_action_links' => $global_action_links,
             'page_links' => $page_links,
+            'filter_fields' => $filter_fields,
+            'filter_operators' => $filter_operators
         );
         return render(Config::get('autolist::autolist.views.list'), $list_data);
     }
