@@ -33,3 +33,7 @@ Autoloader::map(array(
 Autoloader::directories(array(
 
 ));
+
+Asset::container('autolist')
+        ->bundle('autolist')
+        ->add('filter.js'    ,'js/filter.js','jquery');

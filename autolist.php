@@ -303,7 +303,19 @@ class AutoList {
                 $filter_fields[$config['attribute']] = $config; 
             }
         }
-        $filter_operators = array(
+        
+        $filter_optitles = array(
+            'eq'	=> 'Equals',
+            'neq'	=> 'Not equals',
+            'lt'	=> 'Less than',
+            'gt'	=> 'Greater than',
+            'cont'	=> 'Contains',
+            'sw'	=> 'Starts with',
+            'ew'	=> 'Ends with',
+            'btn'	=> 'Between'
+        );
+        
+        $filter_opmap = array(
             'string'    => array(
                 'eq'    => 'st',
                 'neq'   => 'st',
@@ -530,7 +542,8 @@ class AutoList {
             'global_action_links' => $global_action_links,
             'page_links' => $page_links,
             'filter_fields' => $filter_fields,
-            'filter_operators' => $filter_operators
+            'filter_opmap' => $filter_opmap,
+            'filter_optitles' => $filter_optitles
         );
         return render(Config::get('autolist::autolist.views.list'), $list_data);
     }
