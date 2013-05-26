@@ -220,43 +220,31 @@ class AutoList {
     private function _validate_filter_string($filter, $operator, $filter_string) {
         
         $rules = array(
-//            'ibtn' => array(
-//                'filter_string' => '/^[1-9][0-9]*,[1-9][0-9]*$/'
-//            ),
-//            'nbtn' => array(
-//                'filter_string' => '/^([0-9]*.[0.9]+),([0-9]*.[0-9]+)$/'
-//            ),
             'string' => array(
-                'filter_string' => '/^[0-9a-zA-Z]*(,[0-9a-zA-Z]+)*$/'
+                'filter_string' => '/^\s*.*(\s*,\s*.+)*$/'
             ),
             'numeric' => array(
-                'filter_string' => '/^([0-9]*.[0.9]+)+(,[0-9]*.[0.9]+)*$/'
+                'filter_string' => '/^\s*([0-9]*.[0.9]+)+(\s*,\s*[0-9]*.[0.9]+)*$/'
             ),
             'integer' => array(
-                'filter_string' => '/^[1-9][0-9]*(,[1-9][0-9]*)*$/'
+                'filter_string' => '/^\s*[1-9][0-9]*(\s*,\s*[1-9][0-9]*)*$/'
             ),
             'date' => array(
-                'filter_string' => '/^[0-9]+-[0-9]+-[0-9]\s[0-9]+:[0-9]+:[0-9]+(,[0-9]+-[0-9]+-[0-9]\s[0-9]+:[0-9]+:[0-9]+)*$/'
-            )
+                'filter_string' => '/^\s*((((\d{4})(-)(0[13578]|10|12)(-)(0[1-9]|[12][0-9]|3[01]))|((\d{4})(-)(0[469]|1‌​1)(-)([0][1-9]|[12][0-9]|30))|((\d{4})(-)(02)(-)(0[1-9]|1[0-9]|2[0-8]))|(([02468]‌​[048]00)(-)(02)(-)(29))|(([13579][26]00)(-)(02)(-)(29))|(([0-9][0-9][0][48])(-)(0‌​2)(-)(29))|(([0-9][0-9][2468][048])(-)(02)(-)(29))|(([0-9][0-9][13579][26])(-)(02‌​)(-)(29)))(\s([0-1][0-9]|2[0-4]):([0-5][0-9]):([0-5][0-9])))(,\s*((((\d{4})(-)(0[13578]|10|12)(-)(0[1-9]|[12][0-9]|3[01]))|((\d{4})(-)(0[469]|1‌​1)(-)([0][1-9]|[12][0-9]|30))|((\d{4})(-)(02)(-)(0[1-9]|1[0-9]|2[0-8]))|(([02468]‌​[048]00)(-)(02)(-)(29))|(([13579][26]00)(-)(02)(-)(29))|(([0-9][0-9][0][48])(-)(0‌​2)(-)(29))|(([0-9][0-9][2468][048])(-)(02)(-)(29))|(([0-9][0-9][13579][26])(-)(02‌​)(-)(29)))(\s([0-1][0-9]|2[0-4]):([0-5][0-9]):([0-5][0-9])))+)*$/'
+            ) // Strictly for MySQL
         );
 
         $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['string'];
         $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['number_btn'] = $rules['numeric'];
         $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer_btn'] = $rules['integer'];
         $rules['enum_eq'] = $rules['enum_neq'] = $rules['string'];
-        //$rules['in_eq'] = $rules['in_neq'] = $rules['string'];
         $rules['date_eq'] = $rules['date_neq'] = $rules['date_gt'] = $rules['date_lt'] = $rules['date_btn'] = $rules['date']; 
-        
-        
-        
-
 
         $operator_rules = $rules[$filter . '_' . $operator]['filter_string'];
         
         if (preg_match($operator_rules, $filter_string)) {
             return true;
         } else {
-            //echo "Not found";
             return false;
         }
     }
@@ -295,16 +283,14 @@ class AutoList {
         }
         
         /* ----------- Filtering start */
-        
-        
-        $filter_fields = array();
+        $filter_fields = array();  // Building up data for filter UI
         foreach($this->config['attributes'] as $config) {
             if ($this->_filter_enabled($config['attribute']) == true) {
                 $filter_fields[$config['attribute']] = $config; 
             }
         }
-        
-        $filter_optitles = array(
+
+        $filter_optitles = array( //Titles to be used in the filtering UI
             'eq'	=> 'Equals',
             'neq'	=> 'Not equals',
             'lt'	=> 'Less than',
@@ -315,7 +301,7 @@ class AutoList {
             'btn'	=> 'Between'
         );
         
-        $filter_opmap = array(
+        $filter_opmap = array(  //Operator mapping for filtering UI
             'string'    => array(
                 'eq'    => 'st',
                 'neq'   => 'st',
@@ -352,10 +338,10 @@ class AutoList {
         
         
         
-        $filter_by = ( isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL ); // Check if filter is asked for
-        $filter_operator = ( isset($query_params['filter_op']) ? $query_params['filter_op'] : NULL ); // Check if any operator is set
+        $filter_by = ( isset($query_params['filter_by']) ? $query_params['filter_by'] : NULL ); 
+        $filter_operator = ( isset($query_params['filter_op']) ? $query_params['filter_op'] : NULL ); 
         $filter_string = ( isset($query_params['filter_str']) ? $query_params['filter_str'] : NULL );
-        
+        $filter_string = implode(',',$filter_string); // Input taken using filter_str[]
         
         if ( !is_null($filter_by) && !is_null($filter_operator) && $this->_filter_enabled($filter_by) ) { // Filter has been asked for
             $configs = $this->config['attributes']; // Fetched the configs to shorten lines
@@ -363,24 +349,20 @@ class AutoList {
             $active_filter_by = NULL;
             if ( isset($configs[$filter_by]['decoder_for_sql']) ) {
                 $active_filter_by = ( is_callable($configs[$filter_by]['decoder_for_sql']) ? $configs[$filter_by]['decoder_for_sql']($filter_by) : $configs[$filter_by]['decoder_for_sql'] );
-                $active_filter_by = DB::raw($active_filter_by);
-                
+                $active_filter_by = DB::raw($active_filter_by); //Prepare for using in SQL
             }
             
             $active_filter_type = NULL; // Default filter field is NULL
-            if ( $configs[$filter_by]['expose_filter'] == true ) { // Check if filtering on that column is allowed
-                $active_filter_type = $configs[$filter_by]['filter_type']; // Fetched the configured filter_type
-                if ( is_array($active_filter_type) ) { // Decisive, array() = enumerated list, non_array = defined type
-                    $active_filter_type = 'enum'; // Set the filter type to enum for further compatibility
-                }
-            }
             
+            $active_filter_type = $configs[$filter_by]['filter_type']; // Fetched the configured filter_type
+            if ( is_array($active_filter_type) ) { // Decisive, array() = enumerated list, non_array = defined type
+                $active_filter_type = 'enum'; // Set the filter type to enum for further compatibility
+            }
             
             $active_filter_operator = NULL; // Default filter operator is NULL
             if ( !is_null($active_filter_type) ) { // Filter is valid
                 $active_filter_operator = $this->_find_filter_operator($active_filter_type, $filter_operator); // Operator that is going to be used in querries
             }
-            
             
             if ( !is_null($active_filter_by) && !is_null($active_filter_type) && !is_null($active_filter_operator) ) { // Filter is applicable if valid query is found
                 $is_valid = false; // Default
@@ -388,9 +370,8 @@ class AutoList {
                 if ($active_filter_type == 'string' || $active_filter_type == 'date') { // For string and date data types, exceptions are applied
                     $is_valid = true;
                 }
-
+                
                 if ($is_valid) {
-                    
                     
                     if ($active_filter_type != 'enum') { // 'string','integer','date','number'
                         $active_filter_list = explode(',',$filter_string);
@@ -544,7 +525,7 @@ class AutoList {
             'filter_fields' => $filter_fields,
             'filter_opmap' => $filter_opmap,
             'filter_optitles' => $filter_optitles
-        );
+        );       
         return render(Config::get('autolist::autolist.views.list'), $list_data);
     }
 
