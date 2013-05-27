@@ -29,7 +29,7 @@
                 $widget_select.append(st);
             } else if ( widget == 'dt' ) {
                 $widget_select.append(dt);
-            } else {
+            } else if ( widget == 'select' ) {
                 $enum_array = $.parseJSON($('#autolist-filter-by').find(':selected').attr('data-filter-type'));
                 widget_select_list = '';
                 widget_select_list += '<select multiple class="input-medium search-query" id="autolist-filter-select" name="filter_str[]">';

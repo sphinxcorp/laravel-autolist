@@ -204,7 +204,7 @@ class AutoList {
         );
         $filter_operators = array(
             'string' => array('eq','neq','sw', 'cont', 'ew'),
-            'number' => array('eq', 'neq', 'lt', 'gt', 'btn'),
+            'numeric' => array('eq', 'neq', 'lt', 'gt', 'btn'),
             'integer' => array('eq', 'neq', 'lt', 'gt', 'btn'),
             'date' => array('eq','neq','lt', 'gt', 'btn'),
             'enum' => array('eq','neq')
@@ -224,7 +224,7 @@ class AutoList {
                 'filter_string' => '/^\s*.*(\s*,\s*.+)*$/'
             ),
             'numeric' => array(
-                'filter_string' => '/^\s*([0-9]*.[0.9]+)+(\s*,\s*[0-9]*.[0.9]+)*$/'
+                'filter_string' => '/^\s*([0-9]*.[0-9]+)+(\s*,\s*[0-9]*.[0-9]+)*$/'
             ),
             'integer' => array(
                 'filter_string' => '/^\s*[1-9][0-9]*(\s*,\s*[1-9][0-9]*)*$/'
@@ -235,7 +235,7 @@ class AutoList {
         );
 
         $rules['string_eq'] = $rules['string_neq'] = $rules['string_sw'] = $rules['string_ew'] = $rules['string_cont'] = $rules['string'];
-        $rules['number_eq'] = $rules['number_neq'] = $rules['number_gt'] = $rules['number_lt'] = $rules['number_btn'] = $rules['numeric'];
+        $rules['numeric_eq'] = $rules['numeric_neq'] = $rules['numeric_gt'] = $rules['numeric_lt'] = $rules['numeric_btn'] = $rules['numeric'];
         $rules['integer_eq'] = $rules['integer_neq'] = $rules['integer_gt'] = $rules['integer_lt'] = $rules['integer_btn'] = $rules['integer'];
         $rules['enum_eq'] = $rules['enum_neq'] = $rules['string'];
         $rules['date_eq'] = $rules['date_neq'] = $rules['date_gt'] = $rules['date_lt'] = $rules['date_btn'] = $rules['date']; 
@@ -245,6 +245,7 @@ class AutoList {
         if (preg_match($operator_rules, $filter_string)) {
             return true;
         } else {
+  
             return false;
         }
     }
@@ -316,7 +317,7 @@ class AutoList {
                 'gt'    => 'st',
                 'btn'   => 'dt'
             ),
-            'number'    => array(
+            'numeric'    => array(
                 'eq'    => 'st',
                 'neq'   => 'st',
                 'lt'    => 'st',
@@ -365,13 +366,16 @@ class AutoList {
             }
             
             if ( !is_null($active_filter_by) && !is_null($active_filter_type) && !is_null($active_filter_operator) ) { // Filter is applicable if valid query is found
+                
                 $is_valid = false; // Default
                 $is_valid = $this->_validate_filter_string($active_filter_type, $filter_operator, $filter_string); //validate input string
                 if ($active_filter_type == 'string' || $active_filter_type == 'date') { // For string and date data types, exceptions are applied
                     $is_valid = true;
                 }
-                
+
                 if ($is_valid) {
+                    
+                    
                     
                     if ($active_filter_type != 'enum') { // 'string','integer','date','number'
                         $active_filter_list = explode(',',$filter_string);
@@ -407,6 +411,9 @@ class AutoList {
                                 $query = $query->or_where($active_filter_by,$active_filter_operator,$active_filter_string);
                             }
                         } else {
+                            if ( $active_filter_list[0] > $active_filter_list[1] ) {
+                                list($active_filter_list[0], $active_filter_list[1]) = array( $active_filter_list[1], $active_filter_list[0] );
+                            }
                             $query = $query->where_between($active_filter_by,$active_filter_list[0],$active_filter_list[1]);
                         }
                     }
