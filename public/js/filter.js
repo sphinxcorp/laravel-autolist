@@ -14,10 +14,13 @@
             $.each($operators, function($key, $value){
                 $op_select.append('<option value="' + $key + '" data-filter-operator="' + $value + '">' + $operators_title[$key] + '</option>');
             });
-           
         });
         $('#autolist-filter-op').change(function(){
             widget = $(this).find(':selected').attr('data-filter-operator');
+            $field_type = $.parseJSON( $('#autolist-filter-by').find(':selected').attr('data-filter-type') );
+            if ( $.type($field_type) == 'object' ) {
+                $field_type = 'enum';
+            }
             st = '<input id="autolist-filter-text1" type="text" name="filter_str[]"/>';
             dt = '<input id="autolist-filter-text1" type="text" name="filter_str[]"/> <input id="autolist-filter-text2" type="text" name="filter_str[]"/>';
             $widget_select= $('#autolist-filter-inputs').empty();
