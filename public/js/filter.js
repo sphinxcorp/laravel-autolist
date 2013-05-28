@@ -11,7 +11,7 @@
                 select_list = '<select id="autolist-filter-op" name="filter_op" >';
                 select_list += ('<option value="" selected="selected">Select an operator</option>');
                 $.each($operators, function($key, $value){
-                    select_list += ('<option value="' + $key + '" data-filter-operator="' + $value + '">' + $operators_titles[$key] + '</option>');
+                    select_list += ('<option value="' + $key + '" data-filter-widget="' + $value + '">' + $operators_titles[$key] + '</option>');
                 });
                 select_list += '</select>';
                 $op_select.append(select_list);
@@ -19,7 +19,7 @@
         });
         $('#autolist-filter-operators').change(function(){
             $select_list = $('#autolist-filter-op');
-            widget = $select_list.find(':selected').attr('data-filter-operator');
+            widget = $select_list.find(':selected').attr('data-filter-widget');
             $field_type = $.parseJSON( $('#autolist-filter-by').find(':selected').attr('data-filter-type') );
             if ( $.type($field_type) == 'object' ) {
                 $field_type = 'enum';

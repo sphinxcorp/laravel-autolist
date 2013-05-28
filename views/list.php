@@ -20,7 +20,7 @@ if (count($filter_fields) > 0) {
             <?php $key = $filter_fields[Input::get('filter_by')]['filter_type'] ?>
             <?php if (is_array($key)) $key = 'enum' ?>
             <?php foreach ($filter_opmap[$key] as $operator => $widget): ?>
-            <option value="<?php echo e($operator)?>" <?php if (Input::get('filter_op')&&Input::get('filter_op')==$operator) echo 'selected="selected"' ?>  data-filter-operator='<?php echo $widget?>'><?php echo e($filter_optitles[$operator])?></option>
+            <option value="<?php echo e($operator)?>" <?php if (Input::get('filter_op')&&Input::get('filter_op')==$operator) echo 'selected="selected"' ?>  data-filter-widget='<?php echo $widget?>'><?php echo e($filter_optitles[$operator])?></option>
             <?php endforeach; ?>
         </select>
         <?php } ?>
