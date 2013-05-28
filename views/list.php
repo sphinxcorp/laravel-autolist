@@ -39,7 +39,7 @@ if (count($filter_fields) > 0) {
             </select>
             <?php } ?>
         </span>
-        <button type="submit" >Submit</button>
+        <input type="submit" value="Search"/>
     </form>
     <?php
 }
