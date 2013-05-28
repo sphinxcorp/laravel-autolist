@@ -1,49 +1,45 @@
-<?php
-if (count($filter_fields) > 0) {
-    ?>
+<?php if (count($filter_fields) > 0): ?>
     <form method="GET" action="" id="autolist-filter-form">
         <select id="autolist-filter-by" name="filter_by">
             <option value="" <?php echo !Input::get('filter_by')?'selected="selected"':'' ?>>Select a field</option>
-            <?php foreach ($filter_fields as $field): ?>
+        <?php foreach ($filter_fields as $field): ?>
             <?php $operators = $filter_opmap[is_array($field['filter_type'])?'enum':$field['filter_type']] ?>
             <?php $optitles = array() ?>
-            <?php foreach ($operators as $o => $w): ?>
-            <?php $optitles[$o] = $filter_optitles[$o] ?>
-            <?php endforeach ?>
+            <?php foreach ($operators as $operator => $widget): ?>
+            <?php $optitles[$operator] = $filter_optitles[$operator] ?>
+            <?php endforeach; ?>
             <option value="<?php echo e($field['attribute'])?>" <?php echo (Input::get('filter_by')&&Input::get('filter_by')==e($field['attribute']))?'selected="selected"':'' ?> data-filter-type='<?php echo json_encode($field['filter_type'])?>' data-filter-operators='<?php echo json_encode($operators)?>' data-filter-optitles='<?php echo json_encode($optitles)?>' ><?php echo e($field['title'])?></option>
-            <?php endforeach; ?>
-        </select>
+        <?php endforeach;?>
+        </select> 
         <span id="autolist-filter-operators">
-        <?php if (Input::get('filter_by')) { ?>
+        <?php if (Input::get('filter_by')): ?>
         <select id="autolist-filter-op" name="filter_op" data-filter-ops='<?php echo json_encode($filter_opmap)?>' data-filter-optitles='<?php echo json_encode($filter_optitles)?>'>
-            <option value="" <?php if (!Input::get('filter_op')) echo 'selected="selected"' ?>>Select an operator</option>
+            <option value="" <?php if (!Input::get('filter_op')): echo 'selected="selected"'; endif; ?>>Select an operator</option>
             <?php $key = $filter_fields[Input::get('filter_by')]['filter_type'] ?>
-            <?php if (is_array($key)) $key = 'enum' ?>
+            <?php if (is_array($key)): $key = 'enum'; endif; ?>
             <?php foreach ($filter_opmap[$key] as $operator => $widget): ?>
-            <option value="<?php echo e($operator)?>" <?php if (Input::get('filter_op')&&Input::get('filter_op')==$operator) echo 'selected="selected"' ?>  data-filter-widget='<?php echo $widget?>'><?php echo e($filter_optitles[$operator])?></option>
+            <option value="<?php echo e($operator)?>" <?php if (Input::get('filter_op')&&Input::get('filter_op')==$operator): echo 'selected="selected"'; endif; ?>  data-filter-widget='<?php echo $widget?>'><?php echo e($filter_optitles[$operator])?></option>
             <?php endforeach; ?>
         </select>
-        <?php } ?>
+        <?php endif; ?>
         </span>
         <span id="autolist-filter-inputs">
-            <?php if ($key!='enum' && count(Input::get('filter_str')) == 1) { ?>
+        <?php if ($key!='enum' && count(Input::get('filter_str')) == 1): ?>
             <input id="autolist-filter-text1" value="<?php echo implode(',',Input::get('filter_str')) ?>" type="text" name="filter_str[]"/>
-            <?php } else if ($key != 'enum' && count(Input::get('filter_str')) == 2) { ?>
+        <?php elseif ($key != 'enum' && count(Input::get('filter_str')) == 2): ?>
             <?php $text = Input::get('filter_str') ?>
             <input id="autolist-filter-text1" value="<?php echo $text[0] ?>" type="text" name="filter_str[]"/> <input id="autolist-filter-text2" value="<?php echo $text[1] ?>" type="text" name="filter_str[]"/>
-            <?php } else if ($key == 'enum') { ?>
+        <?php elseif ($key == 'enum'): ?>
             <select multiple class="input-medium search-query" id="autolist-filter-select" name="filter_str[]">
-                <?php foreach ($filter_fields[Input::get('filter_by')]['filter_type'] as $option => $show): ?>
-                <option value="<?php echo $option ?>" <?php if (in_array($option,Input::get('filter_str'))) echo 'selected="selected"' ?> data-filter-str="<?php echo $option ?>"><?php echo $show ?></option>
-                <?php endforeach; ?>
+            <?php foreach ($filter_fields[Input::get('filter_by')]['filter_type'] as $option => $show): ?>
+                <option value="<?php echo $option ?>" <?php if (in_array($option,Input::get('filter_str'))): echo 'selected="selected"'; endif; ?> data-filter-str="<?php echo $option ?>"><?php echo $show ?></option>
+            <?php endforeach; ?>
             </select>
-            <?php } ?>
+        <?php endif; ?>
         </span>
         <input type="submit" value="Search"/>
     </form>
-    <?php
-}
-?>
+<?php endif; ?>
 <table class="autolist">
     <caption><?php echo $title ; ?> </caption>
     <thead>
