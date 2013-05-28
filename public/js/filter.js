@@ -1,22 +1,23 @@
 (function($) {
     $(function(){
         $('#autolist-filter-by').change(function (){
-            $field = $.parseJSON($(this).find(':selected').attr('data-filter-type')); //$fields[$(this).val()]['filter_type'];
-            if ( $.type($field) == 'object' ) {
-                $field = 'enum';
-            }
-            $operators = $.parseJSON($('#autolist-filter-op').attr("data-filter-ops"));
-            $operators = $operators[$field];
-            $operators_title = $.parseJSON($('#autolist-filter-op').attr("data-filter-optitles"));
-            $op_select = $('#autolist-filter-op');
-            $op_select.html('');
-            $op_select.append('<option value="" selected="selected">Select</option>');
+            $operators = $.parseJSON($(this).find(':selected').attr("data-filter-operators"));
+            $operators_titles = $.parseJSON($(this).find(':selected').attr("data-filter-optitles"));
+            select_list = '<select id="autolist-filter-op" name="filter_op" >';
+            select_list += ('<option value="" selected="selected">Select an operator</option>');
             $.each($operators, function($key, $value){
-                $op_select.append('<option value="' + $key + '" data-filter-operator="' + $value + '">' + $operators_title[$key] + '</option>');
+                select_list += ('<option value="' + $key + '" data-filter-operator="' + $value + '">' + $operators_titles[$key] + '</option>');
             });
+            select_list += '</select>';
+            $op_select = $('#autolist-filter-operators').empty();
+            $op_select.html('');
+            $op_select.append(select_list);
+            $widget = $('#autolist-filter-inputs').empty();
+            $widget.html('');
         });
-        $('#autolist-filter-op').change(function(){
-            widget = $(this).find(':selected').attr('data-filter-operator');
+        $('#autolist-filter-operators').change(function(){
+            $select_list = $('#autolist-filter-op');
+            widget = $select_list.find(':selected').attr('data-filter-operator');
             $field_type = $.parseJSON( $('#autolist-filter-by').find(':selected').attr('data-filter-type') );
             if ( $.type($field_type) == 'object' ) {
                 $field_type = 'enum';

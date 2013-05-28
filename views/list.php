@@ -3,21 +3,28 @@ if (count($filter_fields) > 0) {
     ?>
     <form method="GET" action="" id="autolist-filter-form">
         <select id="autolist-filter-by" name="filter_by">
-            <option value="" <?php echo !Input::get('filter_by')?'selected="selected"':'' ?>>Select</option>
+            <option value="" <?php echo !Input::get('filter_by')?'selected="selected"':'' ?>>Select a field</option>
             <?php foreach ($filter_fields as $field): ?>
-            <option value="<?php echo e($field['attribute'])?>" <?php echo (Input::get('filter_by')&&Input::get('filter_by')==e($field['attribute']))?'selected="selected"':'' ?> data-filter-type='<?php echo json_encode($field['filter_type'])?>'><?php echo e($field['title'])?></option>
+            <?php $operators = $filter_opmap[is_array($field['filter_type'])?'enum':$field['filter_type']] ?>
+            <?php $optitles = array() ?>
+            <?php foreach ($operators as $o => $w): ?>
+            <?php $optitles[$o] = $filter_optitles[$o] ?>
+            <?php endforeach ?>
+            <option value="<?php echo e($field['attribute'])?>" <?php echo (Input::get('filter_by')&&Input::get('filter_by')==e($field['attribute']))?'selected="selected"':'' ?> data-filter-type='<?php echo json_encode($field['filter_type'])?>' data-filter-operators='<?php echo json_encode($operators)?>' data-filter-optitles='<?php echo json_encode($optitles)?>' ><?php echo e($field['title'])?></option>
             <?php endforeach; ?>
         </select>
+        <span id="autolist-filter-operators">
+        <?php if (Input::get('filter_by')) { ?>
         <select id="autolist-filter-op" name="filter_op" data-filter-ops='<?php echo json_encode($filter_opmap)?>' data-filter-optitles='<?php echo json_encode($filter_optitles)?>'>
-            <option value="" <?php if (!Input::get('filter_op')) echo 'selected="selected"' ?>>Select</option>
-            <?php if (Input::get('filter_by')) { ?>
+            <option value="" <?php if (!Input::get('filter_op')) echo 'selected="selected"' ?>>Select an operator</option>
             <?php $key = $filter_fields[Input::get('filter_by')]['filter_type'] ?>
             <?php if (is_array($key)) $key = 'enum' ?>
             <?php foreach ($filter_opmap[$key] as $operator => $widget): ?>
             <option value="<?php echo e($operator)?>" <?php if (Input::get('filter_op')&&Input::get('filter_op')==$operator) echo 'selected="selected"' ?>  data-filter-operator='<?php echo $widget?>'><?php echo e($filter_optitles[$operator])?></option>
             <?php endforeach; ?>
-            <?php } ?>
         </select>
+        <?php } ?>
+        </span>
         <span id="autolist-filter-inputs">
             <?php if ($key!='enum' && count(Input::get('filter_str')) == 1) { ?>
             <input id="autolist-filter-text1" value="<?php echo implode(',',Input::get('filter_str')) ?>" type="text" name="filter_str[]"/>
